@@ -1,6 +1,6 @@
 import numpy as np
 import heapq
-from primitive import Primitive
+from primitive import PrimitiveCar
 from collections import defaultdict
 
 class State:
