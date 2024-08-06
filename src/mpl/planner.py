@@ -1,11 +1,11 @@
 import numpy as np
 from typing import List, Optional
-from state_space import StateSpace
-from env import EnvBase
-from primitive import PrimitiveCar
-from trajectory import Trajectory
-from graph_search import GraphSearch
-from waypoint import Waypoint
+from mpl.state_space import StateSpace
+from mpl.env_base import EnvBase
+from mpl.primitive import Primitive
+from mpl.trajectory import Trajectory
+from mpl.graph_search import GraphSearch
+from mpl.waypoint import Waypoint
 
 
 class Planner:
@@ -24,7 +24,7 @@ class Planner:
     def getTraj(self) -> Trajectory:
         return self.traj
     
-    def getValidPrimitives(self) -> List[PrimitiveCar]:
+    def getValidPrimitives(self) -> List[Primitive]:
         prs = []
         if self.ss_ptr:
             for it in self.ss_ptr.hm_.values():
@@ -32,7 +32,7 @@ class Planner:
                     for i, key in enumerate(it.pred_coord):
                         if np.isinf(it.pred_action_cost[i]):
                             continue
-                        pr = PrimitiveCar(self.ENV.get_dt())
+                        pr = Primitive(self.ENV.get_dt())
                         self.ENV.forward_action(self.ss_ptr.hm_[key].coord, it.pred_action_id[i], pr)
                         prs.append(pr)
         
@@ -41,13 +41,13 @@ class Planner:
         
         return prs
     
-    def getAllPrimitives(self) -> List[PrimitiveCar]:
+    def getAllPrimitives(self) -> List[Primitive]:
         prs = []
         if self.ss_ptr:
             for it in self.ss_ptr.hm_.values():
                 if it and it.pred_coord:
                     for i, key in enumerate(it.pred_coord):
-                        pr = PrimitiveCar(self.ENV.get_dt())
+                        pr = Primitive(self.ENV.get_dt())
                         self.ENV.forward_action(key, it.pred_action_id[i], pr)
                         prs.append(pr)
         
@@ -106,7 +106,7 @@ class Planner:
     def getExpandedNodes(self) -> List[np.ndarray]:
         return self.ENV.get_expanded_nodes() if self.ENV else []
     
-    def getExpandedEdges(self) -> List[PrimitiveCar]:
+    def getExpandedEdges(self) -> List[Primitive]:
         return self.ENV.get_expanded_edges() if self.ENV else []
     
     def getExpandedNum(self) -> int:

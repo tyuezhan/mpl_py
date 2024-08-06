@@ -28,6 +28,9 @@ catkin_package(
     tf2
 )
 
+# Python package installation
+catkin_python_setup()
+
 include_directories(
   include
   ${catkin_INCLUDE_DIRS}

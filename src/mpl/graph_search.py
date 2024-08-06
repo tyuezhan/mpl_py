@@ -1,7 +1,7 @@
-from state_space import State
+from mpl.state_space import State
 import heapq
 import numpy as np
-from primitive import PrimitiveCar
+from mpl.primitive import Primitive
 
 class GraphSearch:
     def __init__(self, verbose=False):
@@ -129,7 +129,7 @@ class GraphSearch:
                 if ENV.get_type():
                     yaw_idx = curr_node.pred_yaw_id[min_id]
                 curr_node = ss.hm[key]
-                pr = PrimitiveCar()
+                pr = Primitive()
                 if not ENV.get_type():
                     ENV.forward_action(curr_node.coord, action_idx, pr)
                 else:

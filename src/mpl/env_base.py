@@ -121,10 +121,6 @@ class EnvBase:
         print("Used Null is_free() for pt")
         return True
 
-    def is_free_primitive(self, pr):
-        print("Used Null is_free() for pr")
-        return True
-
     def calculate_intrinsic_cost(self, pr):
         return pr.J(pr.control()) + self.w * self.dt
 

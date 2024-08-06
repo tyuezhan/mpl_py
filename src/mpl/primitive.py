@@ -1,6 +1,6 @@
 import numpy as np
 
-class PrimitiveCar:
+class Primitive:
     def __init__(self, p: list | np.ndarray=None, u_v: float=0.0, u_w: float=0.0) -> None:
         '''
         p: Initial state vector (x, y, z, yaw)
@@ -72,7 +72,7 @@ if __name__ == "__main__":
     u_v = 1.0         # Linear velocity
     u_w = 0.5         # Angular velocity
 
-    car = PrimitiveCar(p, u_v, u_w)
+    car = Primitive(p, u_v, u_w)
 
     t = 1.0  # Time
     print("J(t):", car.J(t))

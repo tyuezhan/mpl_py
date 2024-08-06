@@ -1,6 +1,6 @@
 import numpy as np
 from typing import List, Union
-from waypoint import Waypoint
+from mpl.waypoint import Waypoint
 
 class Command:
     def __init__(self, pos: np.ndarray, vel: np.ndarray, acc: np.ndarray, jrk: np.ndarray,
