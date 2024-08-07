@@ -3,8 +3,7 @@ import time
 import rospy
 
 class EnvBase:
-    def __init__(self, dim):
-        self.dim = dim
+    def __init__(self):
         self.dt = 1.0
         self.tol_pos = 0.5
         self.tol_vel = -1.0

@@ -8,7 +8,6 @@ class EnvMap(EnvBase):
     def __init__(self, map_util):
         super().__init__()
         self.map_util = map_util
-        self.potential_map = []
         self.gradient_map = []
         self.potential_weight = 0.1
         self.gradient_weight = 0.0
@@ -40,27 +39,23 @@ class EnvMap(EnvBase):
 
         dt = primitive.t / n
         for t in np.arange(0, primitive.t, dt):
+            # TODO: precompute the primitive will make this faster
             pt = primitive.evaluate(t)
-            pn = self.map_util.float_to_int(pt.pos)
-            idx = self.map_util.get_index(pn)
+            # pn = self.map_util.float_to_int(pt.pos)
+            # idx = self.map_util.get_index(pn)
 
-            if self.map_util.is_outside(pn) or (self.search_region and not self.search_region[idx]):
+            # if self.map_util.is_outside(pn) or (self.search_region and not self.search_region[idx]):
+                # return float('inf')
+            if self.map_util.is_outside(pt.pos):
+                return float('inf')
+            elif self.map_util.is_occupied(pt.pos):
                 return float('inf')
 
-            if self.potential_map:
-                if 0 < self.potential_map[idx] < 100:
-                    c += dt * (self.potential_weight * self.potential_map[idx] +
-                               self.gradient_weight * np.linalg.norm(pt.vel))
-                elif self.potential_map[idx] >= 100:
-                    return float('inf')
-            elif self.map_util.is_occupied(pn):
-                return float('inf')
-
-            if self.wyaw > 0 and pt.use_yaw:
-                v = pt.vel[:2]
-                if np.linalg.norm(v) > 1e-5:
-                    v_value = 1 - np.dot(v / np.linalg.norm(v), [np.cos(pt.yaw), np.sin(pt.yaw)])
-                    c += self.wyaw * v_value * dt
+            # if self.wyaw > 0 and pt.use_yaw:
+            #     v = pt.vel[:2]
+            #     if np.linalg.norm(v) > 1e-5:
+            #         v_value = 1 - np.dot(v / np.linalg.norm(v), [np.cos(pt.yaw), np.sin(pt.yaw)])
+            #         c += self.wyaw * v_value * dt
 
         # if primitive.control == 'CAR':
         #     p0 = primitive.evaluate(0)
@@ -71,6 +66,7 @@ class EnvMap(EnvBase):
         
         return c
 
+    # TODO: vectorize this
     def get_succ(self, curr, succ, succ_cost, action_idx):
         succ.clear()
         succ_cost.clear()
@@ -79,9 +75,10 @@ class EnvMap(EnvBase):
         self.expanded_nodes.append(curr.pos)
         for i, u in enumerate(self.U):
             primitive = Primitive(curr, u, self.dt)
+            # TODO: we can make this faster by pre-compute the primitive
             tn = primitive.evaluate(self.dt)
 
-            if tn == curr or not self.validate_primitive(primitive, self.v_max, self.a_max, self.j_max, self.yaw_max):
+            if tn == curr:
                 continue
             tn.t = curr.t + self.dt
             succ.append(tn)

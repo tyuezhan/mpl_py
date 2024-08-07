@@ -4,8 +4,9 @@ from catkin_pkg.python_setup import generate_distutils_setup
 
 # fetch values from package.xml
 setup_args = generate_distutils_setup(
-    packages=["active_dsg_planner"],
-    package_dir={"": "include"},
+    packages=["mpl", "utils"],
+    package_dir={"mpl": "src/mpl", "utils": "src/utils"},
 )
+
 setup(**setup_args)
 

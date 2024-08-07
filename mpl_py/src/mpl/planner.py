@@ -2,6 +2,7 @@ import numpy as np
 from typing import List, Optional
 from mpl.state_space import StateSpace
 from mpl.env_base import EnvBase
+from mpl.env_map_gs import EnvMap
 from mpl.primitive import Primitive
 from mpl.trajectory import Trajectory
 from mpl.graph_search import GraphSearch
@@ -17,7 +18,13 @@ class Planner:
         self.epsilon: float = 1.0
         self.max_num: int = -1
         self.planner_verbose: bool = verbose
-    
+        self.map_util = None
+
+    def setMapUtil(self, map_util):
+        self.ENV = EnvMap(map_util)
+        print("[MapPlanner] use MPL")
+        self.map_util = map_util
+
     def initialized(self) -> bool:
         return self.ss_ptr is not None
     
@@ -126,11 +133,6 @@ class Planner:
     def reset(self):
         self.ss_ptr = None
         self.traj = Trajectory(self.traj.dimension)
-    
-    def setLPAstar(self, use_lpastar: bool):
-        self.use_lpastar = use_lpastar
-        if self.planner_verbose:
-            print(f"[PlannerBase] use {'Lifelong Planning A*' if use_lpastar else 'normal A*'}")
     
     def setVmax(self, v: float):
         if self.ENV:
