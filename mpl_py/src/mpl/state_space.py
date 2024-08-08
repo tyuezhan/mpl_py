@@ -1,5 +1,6 @@
 import numpy as np
-import heapq
+# import heapq
+import heapdict
 from mpl.primitive import Primitive
 from collections import defaultdict
 
@@ -22,7 +23,7 @@ class State:
 
 class StateSpace:
     def __init__(self, eps=1.0):
-        self.pq_ = []
+        self.pq_ = heapdict.heapdict()
         self.hm_ = defaultdict(lambda: None)
         self.eps_ = eps
         self.dt_ = 0.0
@@ -38,27 +39,27 @@ class StateSpace:
         else:
             return self.best_child_[0].coord.t
 
-    def updateNode(self, currNode_ptr):
-        if currNode_ptr.rhs != self.start_rhs_:
-            currNode_ptr.rhs = float('inf')
-            for i in range(len(currNode_ptr.pred_coord)):
-                pred_key = currNode_ptr.pred_coord[i]
-                if currNode_ptr.rhs > self.hm_[pred_key].g + currNode_ptr.pred_action_cost[i]:
-                    currNode_ptr.rhs = self.hm_[pred_key].g + currNode_ptr.pred_action_cost[i]
+    # def updateNode(self, currNode_ptr):
+    #     if currNode_ptr.rhs != self.start_rhs_:
+    #         currNode_ptr.rhs = float('inf')
+    #         for i in range(len(currNode_ptr.pred_coord)):
+    #             pred_key = currNode_ptr.pred_coord[i]
+    #             if currNode_ptr.rhs > self.hm_[pred_key].g + currNode_ptr.pred_action_cost[i]:
+    #                 currNode_ptr.rhs = self.hm_[pred_key].g + currNode_ptr.pred_action_cost[i]
 
-        if currNode_ptr.iterationopened and not currNode_ptr.iterationclosed:
-            self.pq_.remove((self.calculateKey(currNode_ptr), currNode_ptr))
-            heapq.heapify(self.pq_)
-            currNode_ptr.iterationclosed = True
+    #     if currNode_ptr.iterationopened and not currNode_ptr.iterationclosed:
+    #         self.pq_.remove((self.calculateKey(currNode_ptr), currNode_ptr))
+    #         heapq.heapify(self.pq_)
+    #         currNode_ptr.iterationclosed = True
 
-        if currNode_ptr.g != currNode_ptr.rhs:
-            fval = self.calculateKey(currNode_ptr)
-            heapq.heappush(self.pq_, (fval, currNode_ptr))
-            currNode_ptr.iterationopened = True
-            currNode_ptr.iterationclosed = False
+    #     if currNode_ptr.g != currNode_ptr.rhs:
+    #         fval = self.calculateKey(currNode_ptr)
+    #         heapq.heappush(self.pq_, (fval, currNode_ptr))
+    #         currNode_ptr.iterationopened = True
+    #         currNode_ptr.iterationclosed = False
 
-    def calculateKey(self, node):
-        return min(node.g, node.rhs) + self.eps_ * node.h
+    # def calculateKey(self, node):
+    #     return min(node.g, node.rhs) + self.eps_ * node.h
 
     def checkValidation(self, hm):
         for coord, state in hm.items():

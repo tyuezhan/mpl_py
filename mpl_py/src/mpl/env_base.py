@@ -1,6 +1,7 @@
 import numpy as np
 import time
 import rospy
+from mpl.primitive import Primitive
 
 class EnvBase:
     def __init__(self):
@@ -28,7 +29,22 @@ class EnvBase:
         self.all_init_yaws = []
         self.all_control_pts = {}
         self.all_view_costs = {}
+        self.heur_ignore_dynamics = False
 
+    def set_u(self, U):
+        self.U = U
+
+    def set_v_max(self, v):
+        self.v_max = v
+    
+    def set_a_max(self, a):
+        self.a_max = a
+
+    def set_j_max(self, j):
+        self.j_max = j
+
+    def set_yaw_max(self, yaw):
+        self.yaw_max = yaw
 
     def set_dt(self, dt):
         self.dt = dt
@@ -78,6 +94,33 @@ class EnvBase:
     def set_all_view_costs(self, all_view_costs):
         self.all_view_costs = all_view_costs
 
+    def get_expanded_nodes(self):
+        return self.expanded_nodes
+    
+    def get_expanded_edges(self):
+        return self.expanded_edges
+
+    def get_heur(self, state):
+        if self.goal_node == state:
+            return 0
+        if self.heur_ignore_dynamics:
+            if self.v_max > 0:
+                return self.w * np.linalg.norm(state.pos - self.goal_node.pos, ord=np.inf) / self.v_max
+            else:
+                return self.w * np.linalg.norm(state.pos - self.goal_node.pos, ord=np.inf)
+        else:
+            return self.w * np.linalg.norm(state.pos - self.goal_node.pos) / self.v_max
+        
+    # Recover trajectory
+    def forward_action(self, curr, action_id):
+        p0 = []
+        p0.append(curr.pos[0])
+        p0.append(curr.pos[1])
+        p0.append(curr.vel[0])
+        p0.append(curr.yaw)
+        pr = Primitive(p0, self.U[action_id], self.dt)
+        return pr
+
     def plan_timeout(self):
         t_now = rospy.Time.now()
         duration_s = (t_now - self.plan_start_time).to_sec()
@@ -121,7 +164,7 @@ class EnvBase:
         return True
 
     def calculate_intrinsic_cost(self, pr):
-        return pr.J(pr.control()) + self.w * self.dt
+        return pr.J() + self.w * self.dt
 
     def get_dt(self):
         return self.dt
@@ -131,12 +174,6 @@ class EnvBase:
 
     def get_succ_with_yaw(self, curr, succ, succ_cost, action_idx, yaw_idx):
         print("Used Null get_succ()")
-
-    def set_type(self, use_topp):
-        self.use_topp = use_topp
-
-    def get_type(self):
-        return self.use_topp
 
     def get_search_region(self):
         return self.search_region

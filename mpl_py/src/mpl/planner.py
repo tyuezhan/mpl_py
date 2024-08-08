@@ -10,10 +10,10 @@ from mpl.waypoint import Waypoint
 
 
 class Planner:
-    def __init__(self, dimension: int, verbose: bool = False):
+    def __init__(self, verbose: bool = False):
         self.ENV: Optional[EnvBase] = None
         self.ss_ptr: Optional[StateSpace] = None
-        self.traj: Trajectory = Trajectory(dimension)
+        self.traj: Trajectory = Trajectory()
         self.traj_cost: float = float('inf')
         self.epsilon: float = 1.0
         self.max_num: int = -1
@@ -31,22 +31,22 @@ class Planner:
     def getTraj(self) -> Trajectory:
         return self.traj
     
-    def getValidPrimitives(self) -> List[Primitive]:
-        prs = []
-        if self.ss_ptr:
-            for it in self.ss_ptr.hm_.values():
-                if it and it.pred_coord:
-                    for i, key in enumerate(it.pred_coord):
-                        if np.isinf(it.pred_action_cost[i]):
-                            continue
-                        pr = Primitive(self.ENV.get_dt())
-                        self.ENV.forward_action(self.ss_ptr.hm_[key].coord, it.pred_action_id[i], pr)
-                        prs.append(pr)
+    # def getValidPrimitives(self) -> List[Primitive]:
+    #     prs = []
+    #     if self.ss_ptr:
+    #         for it in self.ss_ptr.hm_.values():
+    #             if it and it.pred_coord:
+    #                 for i, key in enumerate(it.pred_coord):
+    #                     if np.isinf(it.pred_action_cost[i]):
+    #                         continue
+    #                     pr = Primitive(self.ENV.get_dt())
+    #                     self.ENV.forward_action(self.ss_ptr.hm_[key].coord, it.pred_action_id[i], pr)
+    #                     prs.append(pr)
         
-        if self.planner_verbose:
-            print(f"number of states in hm: {len(self.ss_ptr.hm_)}, number of valid prs: {len(prs)}")
+    #     if self.planner_verbose:
+    #         print(f"number of states in hm: {len(self.ss_ptr.hm_)}, number of valid prs: {len(prs)}")
         
-        return prs
+    #     return prs
     
     def getAllPrimitives(self) -> List[Primitive]:
         prs = []
@@ -110,6 +110,9 @@ class Planner:
         print("=========================")
         return ps
     
+    def getTraj(self):
+        return self.traj
+
     def getExpandedNodes(self) -> List[np.ndarray]:
         return self.ENV.get_expanded_nodes() if self.ENV else []
     
@@ -252,8 +255,8 @@ class Planner:
         
         if self.ss_ptr:
             self.ss_ptr.dt_ = self.ENV.get_dt()
-            self.traj_cost = planner_ptr.Astar(start, self.ENV, self.ss_ptr, self.traj, self.max_num)
-        
+            self.traj_cost, prs = planner_ptr.Astar(start, self.ENV, self.ss_ptr, self.traj, self.max_num)
+            self.traj.init_trajectory(prs)
         if np.isinf(self.traj_cost):
             if self.planner_verbose:
                 print("[PlannerBase] Cannot find a trajectory!")

@@ -1,12 +1,28 @@
 import numpy as np
+from mpl.waypoint import Waypoint
 
 class Primitive:
-    def __init__(self, p: list | np.ndarray=None, u_v: float=0.0, u_w: float=0.0) -> None:
+    def __init__(self, *args) -> None:
         '''
+        
         p: Initial state vector (x, y, z, yaw)
         u_v: Linear velocity
         u_w: Angular velocity
         '''
+
+        if len(args) == 1:
+            #t only
+            p = None
+            u_v = 0
+            u_w = 0
+            self.t = args[0]
+        elif len(args) == 3:
+            p = args[0]
+            u_v = args[1][0]
+            u_w = args[1][1]
+            self.t = args[2]
+        else:
+            raise ValueError("Invalid number of arguments")
         if p is None:
             self.p_ = np.zeros(4)
         else:
@@ -14,11 +30,11 @@ class Primitive:
         self.u_v_ = u_v
         self.u_w_ = u_w
 
-    def J(self, t: float) -> float:
+    def J(self) -> float:
         '''
         Control effort
         '''
-        return self.u_v_ * self.u_v_ * t + self.u_w_ * self.u_w_ * t
+        return self.u_v_ * self.u_v_ * self.t + self.u_w_ * self.u_w_ * self.t
 
     def p(self, t: float) -> np.ndarray:
         '''
@@ -63,6 +79,16 @@ class Primitive:
         Returns the initial state vector [x, y, z, yaw]
         '''
         return self.p_
+
+    def evaluate(self, t: float) -> Waypoint:
+        '''
+        Returns the waypoint at time t
+        '''
+        wp = Waypoint()
+        p_curr = self.p(t)
+        wp.pos = p_curr[:3]
+        wp.yaw = p_curr[3]
+        return wp
 
 
 

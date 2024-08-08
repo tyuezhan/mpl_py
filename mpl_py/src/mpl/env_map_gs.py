@@ -29,12 +29,13 @@ class EnvMap(EnvBase):
 
     # TODO: change this to use the gaussian collision check
     def is_free(self, pt):
-        pn = self.map_util.float_to_int(pt)
-        return self.map_util.is_free(pn)
+        # pn = self.map_util.float_to_int(pt)
+        return self.map_util.is_free(pt)
 
     def traverse_primitive(self, primitive):
-        max_v = max(primitive.max_vel)
-        n = 2 * max(5, int(np.ceil(max_v * primitive.t / self.map_util.get_res())))
+        max_v = primitive.max_vel()
+        # n = 2 * max(5, int(np.ceil(max_v * primitive.t / self.map_util.get_res())))
+        n = 5
         c = 0.0
 
         dt = primitive.t / n
@@ -74,7 +75,12 @@ class EnvMap(EnvBase):
 
         self.expanded_nodes.append(curr.pos)
         for i, u in enumerate(self.U):
-            primitive = Primitive(curr, u, self.dt)
+            p0 = []
+            p0.append(curr.pos[0])
+            p0.append(curr.pos[1])
+            p0.append(curr.vel[0])
+            p0.append(curr.yaw)
+            primitive = Primitive(p0, u, self.dt)
             # TODO: we can make this faster by pre-compute the primitive
             tn = primitive.evaluate(self.dt)
 
@@ -82,7 +88,10 @@ class EnvMap(EnvBase):
                 continue
             tn.t = curr.t + self.dt
             succ.append(tn)
-            cost = 0 if curr.pos == tn.pos else self.traverse_primitive(primitive)
+            if (curr.pos == tn.pos).all():
+                cost = 0
+            else:
+                cost = self.traverse_primitive(primitive)
             if not np.isinf(cost):
                 cost += self.calculate_intrinsic_cost(primitive)
                 self.expanded_edges.append(primitive)
@@ -101,62 +110,62 @@ class EnvMap(EnvBase):
     def set_potential_weight(self, weight):
         self.potential_weight = weight
 
-    def set_prior_trajectory(self, traj):
-        self.prior_traj.clear()
-        total_time = traj.get_total_time()
-        n = int(np.ceil(self.v_max * total_time / self.map_util.get_res()))
-        pts = traj.sample(n)
+    # def set_prior_trajectory(self, traj):
+    #     self.prior_traj.clear()
+    #     total_time = traj.get_total_time()
+    #     n = int(np.ceil(self.v_max * total_time / self.map_util.get_res()))
+    #     pts = traj.sample(n)
 
-        costs = []
-        for t in np.arange(0, total_time, self.dt):
-            potential_cost = 0
-            if self.potential_map:
-                prev_idx = -1
-                for pt in pts:
-                    if pt.t >= t:
-                        break
-                    pn = self.map_util.float_to_int(pt.pos)
-                    idx = self.map_util.get_index(pn)
-                    if prev_idx == idx:
-                        continue
-                    prev_idx = idx
-                    potential_cost += self.potential_weight * self.potential_map[idx] + \
-                                      self.gradient_weight * np.linalg.norm(pt.vel)
-            costs.append(self.w * t + potential_cost)
-            print(f"t: {t:.2f}, cost: {costs[-1]:.2f}")
+    #     costs = []
+    #     for t in np.arange(0, total_time, self.dt):
+    #         potential_cost = 0
+    #         if self.potential_map:
+    #             prev_idx = -1
+    #             for pt in pts:
+    #                 if pt.t >= t:
+    #                     break
+    #                 pn = self.map_util.float_to_int(pt.pos)
+    #                 idx = self.map_util.get_index(pn)
+    #                 if prev_idx == idx:
+    #                     continue
+    #                 prev_idx = idx
+    #                 potential_cost += self.potential_weight * self.potential_map[idx] + \
+    #                                   self.gradient_weight * np.linalg.norm(pt.vel)
+    #         costs.append(self.w * t + potential_cost)
+    #         print(f"t: {t:.2f}, cost: {costs[-1]:.2f}")
 
-        total_cost = self.traverse_trajectory(traj) + self.w * total_time
-        print(f"total cost: {total_cost:.2f}")
+    #     total_cost = self.traverse_trajectory(traj) + self.w * total_time
+    #     print(f"total cost: {total_cost:.2f}")
 
-        for t in np.arange(0, total_time, self.dt):
-            id_ = int(t / self.dt)
-            self.prior_traj.append((traj.evaluate(t), total_cost - costs[id_]))
+    #     for t in np.arange(0, total_time, self.dt):
+    #         id_ = int(t / self.dt)
+    #         self.prior_traj.append((traj.evaluate(t), total_cost - costs[id_]))
 
-        self.goal_node = traj.evaluate(total_time)
+    #     self.goal_node = traj.evaluate(total_time)
 
-    def traverse_trajectory(self, traj):
-        total_time = traj.get_total_time()
-        n = int(np.ceil(self.v_max * total_time / self.map_util.get_res()))
-        c = 0.0
-        pts = traj.sample(n)
-        prev_idx = -1
-        for pt in pts:
-            pn = self.map_util.float_to_int(pt.pos)
-            idx = self.map_util.get_index(pn)
-            if prev_idx == idx:
-                continue
-            prev_idx = idx
-            if self.map_util.is_outside(pn):
-                return float('inf')
-            if self.potential_map:
-                if 0 < self.potential_map[idx] < 100:
-                    c += self.potential_weight * self.potential_map[idx] + \
-                         self.gradient_weight * np.linalg.norm(pt.vel)
-                elif self.potential_map[idx] >= 100:
-                    return float('inf')
-            elif self.map_util.is_occupied(pn):
-                return float('inf')
-        return c
+    # def traverse_trajectory(self, traj):
+    #     total_time = traj.get_total_time()
+    #     n = int(np.ceil(self.v_max * total_time / self.map_util.get_res()))
+    #     c = 0.0
+    #     pts = traj.sample(n)
+    #     prev_idx = -1
+    #     for pt in pts:
+    #         pn = self.map_util.float_to_int(pt.pos)
+    #         idx = self.map_util.get_index(pn)
+    #         if prev_idx == idx:
+    #             continue
+    #         prev_idx = idx
+    #         if self.map_util.is_outside(pn):
+    #             return float('inf')
+    #         if self.potential_map:
+    #             if 0 < self.potential_map[idx] < 100:
+    #                 c += self.potential_weight * self.potential_map[idx] + \
+    #                      self.gradient_weight * np.linalg.norm(pt.vel)
+    #             elif self.potential_map[idx] >= 100:
+    #                 return float('inf')
+    #         elif self.map_util.is_occupied(pn):
+    #             return float('inf')
+    #     return c
 
     def info(self):
         print("++++++++++++++++++++ EnvMap ++++++++++++++++++")

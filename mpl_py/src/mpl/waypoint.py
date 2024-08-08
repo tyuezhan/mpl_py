@@ -22,8 +22,8 @@ class Waypoint:
     def __ne__(self, other):
         return not self.__eq__(other)
 
-    # def __hash__(self):
-    #     return hash((tuple(self.pos), tuple(self.vel), tuple(self.acc), tuple(self.jrk), self.yaw, self.t, self.control))
+    def __hash__(self):
+        return hash((tuple(self.pos), tuple(self.vel), tuple(self.acc), tuple(self.jrk), self.yaw, self.t, self.control))
 
     def print(self, prefix=""):
         print(f"{prefix}pos: {self.pos}")

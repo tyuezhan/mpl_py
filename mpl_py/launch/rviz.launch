@@ -1,0 +1,7 @@
+<launch>
+  <arg name="rviz_file_path" default="$(find mpl_py)/rviz/planner.rviz"/>
+  <arg name="req" default="true"/>
+  <arg name="output" default="screen"/>
+  <node pkg="rviz" type="rviz" name="rviz" required="$(arg req)" output="$(arg output)" args="-d $(arg rviz_file_path)">
+  </node>
+</launch>

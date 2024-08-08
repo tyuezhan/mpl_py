@@ -16,17 +16,25 @@ class MapUtil:
         self.agent_radius = agent_radius
         self.gaussians = {}
 
+    def set_gaussians(self, gaussians):
+        self.gaussians = gaussians
+
     # TODO: vectorize this so we check collision for all points at once
     def is_free(self, pt):
         # check if the point is free
-        assert pt.shape == (1, 3)
-        self.collision_testing(pt)
+        if pt.shape == (3, ):
+            # make it a 1x3 array
+            pt = pt.reshape(1, 3)
+        ret = self.collision_testing(pt)
+        return torch.sum(ret[:, :, 1]) == 0
 
     
     # TODO: vectorize this so we check collision for all points at once
     def is_occupied(self, pt):
         # check if the point is occupied
-        assert pt.shape == (1, 3)
+        if pt.shape == (3, ):
+            # make it a 1x3 array
+            pt = pt.reshape(1, 3)
         ret = self.collision_testing(pt)
         # sum up the results[:, :, 1] to see if there is any True
         return torch.sum(ret[:, :, 1]) > 0
@@ -49,19 +57,22 @@ class MapUtil:
         and the second column is whether the distance is smaller than the 3*radius+agent radius
         '''
         print("shape of points: ", points.shape)
-        print("shape of gaussians: ", gaussians['means3D'].shape)
-        print("shape of radii: ", gaussians['radii3D'].shape)
-        
+        print("shape of gaussians: ", self.gaussians['means3D'].shape)
+        print("shape of radius: ", self.gaussians['radius'].shape)
+        # if poitns not tensor, convert to tensor
+        if not torch.is_tensor(points):
+            points = torch.tensor(points)
+
         num_points = points.shape[0]
-        num_gaussians = gaussians['means3D'].shape[0]
+        num_gaussians = self.gaussians['means3D'].shape[0]
         
         # Initialize the output array
         results = torch.zeros(num_points, num_gaussians, 2)
         
         # Vectorized implementation
         points = points.unsqueeze(1).repeat(1, num_gaussians, 1)
-        gaussians = gaussians['means3D'].unsqueeze(0).repeat(num_points, 1, 1)
-        radii = gaussians['radius'].unsqueeze(0).repeat(num_points, 1)
+        gaussians = self.gaussians['means3D'].unsqueeze(0).repeat(num_points, 1, 1)
+        radii = self.gaussians['radius'].unsqueeze(0).repeat(num_points, 1)
         
         # Compute distances
         dists = torch.norm(points - gaussians, dim=-1)
@@ -74,4 +85,5 @@ class MapUtil:
         results[:, :, 1] = within_radius.float()  # convert boolean to float for storage
         
         print("return results shape: ", results.shape)
+        print(results)
         return results

@@ -7,13 +7,11 @@ find_package(catkin REQUIRED COMPONENTS
     nav_msgs
     geometry_msgs
     message_generation
-    catkin_simple
     tf2
 )
 
 include_directories(
   ${EIGEN3_INCLUDE_DIRS}
-  ${MOTION_PRIMITIVE_LIBRARY_INCLUDE_DIRS}
   ${catkin_INCLUDE_DIRS}
   include
 )

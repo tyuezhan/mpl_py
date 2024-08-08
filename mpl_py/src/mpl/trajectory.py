@@ -1,6 +1,7 @@
 import numpy as np
 from typing import List, Union
 from mpl.waypoint import Waypoint
+from mpl.primitive import Primitive
 
 class Command:
     def __init__(self, pos: np.ndarray, vel: np.ndarray, acc: np.ndarray, jrk: np.ndarray,
@@ -12,41 +13,6 @@ class Command:
         self.yaw = yaw
         self.yaw_dot = yaw_dot
         self.t = t
-
-class Primitive:
-    def __init__(self, t: float, control: int):
-        self.t = t
-        self.control = control
-    
-    def t(self) -> float:
-        return self.t
-    
-    def control(self) -> int:
-        return self.control
-    
-    def pr(self, index: int):
-        # Assuming pr returns a callable object for position, velocity, acceleration, and jerk
-        return self
-    
-    def evaluate(self, tau: float) -> Waypoint:
-        # Dummy implementation
-        return Waypoint(self.control)
-
-    def max_vel(self, index: int) -> float:
-        # Dummy implementation
-        return 1.0
-    
-    def extrema_vel(self, t: float) -> List[float]:
-        # Dummy implementation
-        return [0.0]
-    
-    def J(self, control: int) -> float:
-        # Dummy implementation
-        return 1.0
-    
-    def Jyaw(self) -> float:
-        # Dummy implementation
-        return 1.0
 
 class Lambda:
     def __init__(self, vs: List[dict]):
@@ -75,15 +41,24 @@ class VirtualPoint:
         self.t = t
 
 class Trajectory:
-    def __init__(self, primitives: List[Primitive]):
-        self.segs = primitives
+    def __init__(self):
+        self.segs = []
         self.taus = [0]
-        for pr in primitives:
-            self.taus.append(pr.t() + self.taus[-1])
         self.Ts = self.taus
         self.total_t_ = self.taus[-1]
         self.lambda_ = Lambda([])  # Initialize with dummy values
     
+    def init_trajectory(self, primitives: List[Primitive]):
+        self.segs = primitives
+        self.taus = [0]
+        for pr in primitives:
+            print(type(pr))
+            print(self.taus[-1])
+            self.taus.append(pr.t + self.taus[-1])
+        self.Ts = self.taus
+        self.total_t_ = self.taus[-1]
+        self.lambda_ = Lambda([])
+
     def evaluate(self, time: float) -> Waypoint:
         tau = self.lambda_.getTau(time)
         if tau < 0: tau = 0
@@ -199,10 +174,7 @@ class Trajectory:
         return ps
 
     def J(self, control: int) -> float:
-        return sum(seg.J(control) for seg in self.segs)
-
-    def Jyaw(self) -> float:
-        return sum(seg.Jyaw() for seg in self.segs)
+        return sum(seg.J() for seg in self.segs)
 
     def get_segment_times(self) -> List[float]:
         return [self.Ts[i + 1] - self.Ts[i] for i in range(len(self.Ts) - 1)]

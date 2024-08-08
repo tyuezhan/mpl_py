@@ -1,0 +1,7 @@
+<launch>
+  <node pkg="mpl_py" type="planner_test.py" name="planner_test_node" output="screen">
+  </node>
+
+  <include file="$(find mpl_py)/launch/rviz.launch">
+  </include>
+</launch>
