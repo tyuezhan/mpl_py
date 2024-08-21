@@ -10,7 +10,7 @@ from mpl.waypoint import Waypoint
 from mpl.map_util import MapUtil
 from scipy.spatial.transform import Rotation as R
 from visualization_msgs.msg import Marker, MarkerArray
-from utils.primitive_ros_utils import *
+from mpl_utils.primitive_ros_utils import *
 import torch
 
 import numpy as np

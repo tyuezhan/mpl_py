@@ -29,11 +29,6 @@ catkin_package(
 # Python package installation
 catkin_python_setup()
 
-include_directories(
-  include
-  ${catkin_INCLUDE_DIRS}
-)
-
 install(DIRECTORY include/${PROJECT_NAME}/
   DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}
 )

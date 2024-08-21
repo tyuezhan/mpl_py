@@ -15,6 +15,12 @@ class MapUtil:
         self.y_max = y_max
         self.agent_radius = agent_radius
         self.gaussians = {}
+        print("[MapUtil] map boundary, x_min: ", self.x_min)
+        print("[MapUtil] map boundary, x_max: ", self.x_max)
+        print("[MapUtil] map boundary, y_min: ", self.y_min)
+        print("[MapUtil] map boundary, y_max: ", self.y_max)
+        print("[MapUtil] agent radius: ", self.agent_radius)
+
 
     def set_gaussians(self, gaussians):
         self.gaussians = gaussians
@@ -52,16 +58,17 @@ class MapUtil:
         and save the distance to each gaussian and whether it is smaller than the radius
         points: [num_points, 3]
         gaussians['means3D']: [num_gaussians, 3] centers of points
-        gaussians['radius']: [num_gaussians] the radius of the gaussians
+        gaussians['radius']: [num_gaussians,1] the radius of the gaussians
         return: [num_points, num_gaussians, 2] where the first column is the distance to each gaussian
         and the second column is whether the distance is smaller than the 3*radius+agent radius
         '''
-        print("shape of points: ", points.shape)
-        print("shape of gaussians: ", self.gaussians['means3D'].shape)
-        print("shape of radius: ", self.gaussians['radius'].shape)
+        self.gaussians['radius'] = self.gaussians['radius'].squeeze()
+        # print("shape of points: ", points.shape)
+        # print("shape of gaussians: ", self.gaussians['means3D'].shape)
+        # print("shape of radius: ", self.gaussians['radius'].shape)
         # if poitns not tensor, convert to tensor
         if not torch.is_tensor(points):
-            points = torch.tensor(points)
+            points = torch.tensor(points).to(self.gaussians['means3D'].device)
 
         num_points = points.shape[0]
         num_gaussians = self.gaussians['means3D'].shape[0]
@@ -84,6 +91,6 @@ class MapUtil:
         results[:, :, 0] = dists
         results[:, :, 1] = within_radius.float()  # convert boolean to float for storage
         
-        print("return results shape: ", results.shape)
-        print(results)
+        # print("return results shape: ", results.shape)
+        # print(results)
         return results
