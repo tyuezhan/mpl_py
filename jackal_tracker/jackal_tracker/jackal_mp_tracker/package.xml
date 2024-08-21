@@ -1,0 +1,28 @@
+<package format="2">
+  <name>jackal_mp_tracker</name>
+  <version>1.0.0</version>
+  <description>jackal_mp_tracker</description>
+  <maintainer email="yztao@seas.upenn.edu">Yuezhan Tao</maintainer>
+
+  <license>TODO</license>
+
+  <!-- Dependencies which this package needs to build itself. -->
+  <buildtool_depend>catkin</buildtool_depend>
+  <depend>rospy</depend>
+  <depend>roscpp</depend>
+  <depend>std_msgs</depend>
+  <depend>nav_msgs</depend>
+  <depend>message_runtime</depend>
+  <depend>message_generation</depend>
+  <depend>sensor_msgs</depend>
+  <depend>geometry_msgs</depend>
+  <depend>motion_primitive_library</depend>
+  <depend>decomp_ros_utils</depend>
+  <depend>planning_ros_utils</depend>
+  <depend>planning_ros_msgs</depend>
+  <depend>tf2</depend>
+  <depend>jackal_tracker_msgs</depend>
+
+
+
+</package>
