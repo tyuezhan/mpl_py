@@ -1,0 +1,6 @@
+[submodule "mpl_ros"]
+	path = mpl_ros
+	url = https://github.com/tyuezhan/mpl_ros.git
+[submodule "catkin_simple"]
+	path = catkin_simple
+	url = git@github.com:catkin/catkin_simple.git
