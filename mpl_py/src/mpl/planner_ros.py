@@ -47,7 +47,7 @@ class LocalPlanner:
         self.num = 1
         self.map_set_ = False
         self.odom_init_ = False
-        self.debug = True
+        self.debug = False
         self.pc_fields_ = self.make_fields()
 
         # Compute U
