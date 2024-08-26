@@ -24,9 +24,7 @@ def to_primitive_ros_msg(pr):
     return msg
 
 def to_primitive_array_ros_msg(prs, z=0):
-    print("to_primitive_array_ros_msg")
-    print(len(prs))
-    print(prs)
+    # print("to_primitive_array_ros_msg")
     msg = PrimitiveArray()
     for pr in prs:
         msg.primitives.append(to_primitive_ros_msg(pr))

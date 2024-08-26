@@ -1,5 +1,6 @@
 import numpy as np
 from mpl.waypoint import Waypoint
+from scipy.spatial.transform import Rotation as R
 
 class Primitive:
     def __init__(self, *args) -> None:
@@ -13,34 +14,62 @@ class Primitive:
         if len(args) == 1:
             #t only
             p = None
-            u_v = 0
-            u_w = 0
+            self.u_v_ = 0
+            self.u_w_ = 0
             self.t = args[0]
+            self.compute_J()
         elif len(args) == 3:
             p = args[0]
-            u_v = args[1][0]
-            u_w = args[1][1]
+            self.u_v_ = args[1][0]
+            self.u_w_ = args[1][1]
             self.t = args[2]
+            self.pose_dict = None
+            self.nt = None
+            self.r = None
+            self.compute_J()
+            # print("Primitive: precompute info not provided")
+        elif len(args) == 4:
+            p = args[0]
+            self.u_v_ = args[1][0]
+            self.u_w_ = args[1][1]
+            self.t = args[2]
+            self.compute_J()
+            # self.pose_dict = args[3]
+            # self.nt = len(self.pose_dict)
+            # self.t_samples = np.linspace(0, self.t, self.nt)
+            # self.r = R.from_euler('z', p[3], degrees=False)
         else:
             raise ValueError("Invalid number of arguments")
         if p is None:
             self.p_ = np.zeros(4)
         else:
             self.p_ = np.array(p, dtype=float)
-        self.u_v_ = u_v
-        self.u_w_ = u_w
+
+
+    def compute_J(self):
+        '''
+        Compute the control effort
+        '''
+        self.J_ = self.u_v_ * self.u_v_ * self.t + self.u_w_ * self.u_w_ * self.t
 
     def J(self) -> float:
         '''
         Control effort
         '''
-        return self.u_v_ * self.u_v_ * self.t + self.u_w_ * self.u_w_ * self.t
+        return self.J_
 
     def p(self, t: float) -> np.ndarray:
         '''
         Returns the state vector [x, y, z, yaw] at time t
         '''
         p_curr = np.zeros(4)
+        # # If t is precomputed:
+        # if self.pose_dict != None and t in self.pose_dict:
+        #     p_curr[:3] = self.r.apply(self.pose_dict[t][:3])
+        #     p_curr[3] = self.pose_dict[t][3]
+        #     p_curr = p_curr + self.p_
+        #     return p_curr
+        # print("Primitive: p(t) not precomputed")
         if self.u_w_ == 0:
             p_curr[0] = self.p_[0] + self.u_v_ * t * np.cos(self.p_[3])
             p_curr[1] = self.p_[1] + self.u_v_ * t * np.sin(self.p_[3])

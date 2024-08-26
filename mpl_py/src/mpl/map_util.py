@@ -26,31 +26,44 @@ class MapUtil:
         self.gaussians = gaussians
 
     # TODO: vectorize this so we check collision for all points at once
-    def is_free(self, pt):
-        # check if the point is free
-        if pt.shape == (3, ):
+    def is_free(self, pts):
+        if not torch.is_tensor(pts):
+            pts = torch.tensor(pts).to(self.gaussians['means3D'].device)
+        # check if a single point is free
+        if pts.shape == (3, ):
             # make it a 1x3 array
-            pt = pt.reshape(1, 3)
-        ret = self.collision_testing(pt)
+            pts = pts.reshape(1, 3)
+        ret = self.collision_testing(pts)
         return torch.sum(ret[:, :, 1]) == 0
 
     
     # TODO: vectorize this so we check collision for all points at once
-    def is_occupied(self, pt):
-        # check if the point is occupied
-        if pt.shape == (3, ):
+    def is_occupied(self, pts):
+        if not torch.is_tensor(pts):
+            pts = torch.tensor(pts).to(self.gaussians['means3D'].device)
+        # check if a single point is occupied
+        if pts.shape == (3, ):
             # make it a 1x3 array
-            pt = pt.reshape(1, 3)
-        ret = self.collision_testing(pt)
+            pts = pts.reshape(1, 3)
+        ret = self.collision_testing(pts)
         # sum up the results[:, :, 1] to see if there is any True
         return torch.sum(ret[:, :, 1]) > 0
 
 
-    def is_outside(self, pt):
-        # check if the point is outside
-        if pt[0] < self.x_min or pt[0] > self.x_max or pt[1] < self.y_min or pt[1] > self.y_max:
-            return True
-
+    def is_outside(self, pts):
+        if not torch.is_tensor(pts):
+            pts = torch.tensor(pts).to(self.gaussians['means3D'].device)
+        # pts is an n x 3 tensor where each row is a 3D point.
+        # Extract the x and y coordinates.
+        x = pts[:, 0]
+        y = pts[:, 1]
+        # comparison for all points at once
+        outside_x = (x < self.x_min) | (x > self.x_max)
+        outside_y = (y < self.y_min) | (y > self.y_max)
+        # combine
+        is_outside = outside_x | outside_y
+        # Return a boolean tensor indicating which points are outside
+        return is_outside.any()
 
     def collision_testing(self, points):
         '''

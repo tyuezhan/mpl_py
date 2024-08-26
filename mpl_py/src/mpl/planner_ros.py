@@ -10,6 +10,8 @@ from mpl.waypoint import Waypoint
 from mpl.map_util import MapUtil
 from scipy.spatial.transform import Rotation as R
 from mpl_utils.primitive_ros_utils import *
+from mpl.primitive_dict import PrimitiveDict
+
 import torch
 
 from sensor_msgs.msg import PointField, PointCloud2
@@ -56,13 +58,15 @@ class LocalPlanner:
         self.U = []
         for dv in np.linspace(0.2 * self.v_max, self.v_max, 3*self.num):
             for dw in np.linspace(-self.yaw_max, self.yaw_max, 3*self.num):
-                self.U.append(np.array([dv, dw]))
+                self.U.append((dv, dw))
         print("Control:", self.U)
 
         # set planner
         self.planner = Planner()
+        self.primitive_dict = PrimitiveDict(5, self.U)
+        self.primitive_dict.precompute()
         self.map_util = MapUtil(self.x_min, self.x_max, self.y_min, self.y_max, self.robot_radius_)
-        self.planner.setMapUtil(self.map_util)
+        self.planner.setMapUtil(self.map_util, self.primitive_dict)
         self.planner.setU(self.U)
         self.planner.setDt(self.dt)
         self.planner.setEpsilon(self.dt)

@@ -3,6 +3,7 @@ from mpl.state_space import State
 import heapdict
 import numpy as np
 from mpl.primitive import Primitive
+import rospy
 
 class GraphSearch:
     def __init__(self, verbose=False):
@@ -33,9 +34,10 @@ class GraphSearch:
         expand_iteration = 0
         best_dist = float('inf')
         best_node = curr_node
-
+        # total_time = 0
         while ss.pq_:
             expand_iteration += 1
+            # s_time = rospy.Time.now()
             # curr_node = heapq.heappop(ss.pq_)[1]
             curr_node = ss.pq_.popitem()[0]
             curr_node.iterationclosed = True
@@ -78,12 +80,14 @@ class GraphSearch:
                         # heapq.heappush(ss.pq_, succ_node.heapkey)
                         ss.pq_[succ_node] = fval
                         succ_node.iterationopened = True
-
+            # print("Iteration time: ", (rospy.Time.now() - s_time).to_sec())
+            # total_time += (rospy.Time.now() - s_time).to_sec()
+            # print("Total time: ", total_time)
             if ENV.is_goal(curr_node.coord):
                 break
 
             if ENV.plan_timeout():
-                print("Reach Max Search Time!")
+                print("Reach Max Search Time!, recover best Trajectory!")
                 find_traj, traj_prs = self.recover_traj(best_node, ss, ENV, start_coord)
                 return best_node.g, traj_prs
 

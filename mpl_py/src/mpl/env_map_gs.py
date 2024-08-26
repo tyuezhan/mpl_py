@@ -1,13 +1,15 @@
 import numpy as np
 from mpl.primitive import Primitive
 from mpl.env_base import EnvBase
+import rospy
 
 # calls the collison check from map_utils
 
 class EnvMap(EnvBase):
-    def __init__(self, map_util):
+    def __init__(self, map_util, primitive_dict):
         super().__init__()
         self.map_util = map_util
+        self.primitive_dict = primitive_dict
         self.gradient_map = []
         self.potential_weight = 0.1
         self.gradient_weight = 0.0
@@ -35,23 +37,25 @@ class EnvMap(EnvBase):
     def traverse_primitive(self, primitive):
         max_v = primitive.max_vel()
         # n = 2 * max(5, int(np.ceil(max_v * primitive.t / self.map_util.get_res())))
-        n = 5
+        n = 2
         c = 0.0
 
-        dt = primitive.t / n
-        for t in np.arange(0, primitive.t, dt):
+        # dt = primitive.t / n
+        pts_pos = []
+        for t in np.linspace(0, primitive.t, n):
             # TODO: precompute the primitive will make this faster
             pt = primitive.evaluate(t)
+            pts_pos.append(pt.pos)
             # pn = self.map_util.float_to_int(pt.pos)
             # idx = self.map_util.get_index(pn)
-
-            # if self.map_util.is_outside(pn) or (self.search_region and not self.search_region[idx]):
-                # return float('inf')
-            if self.map_util.is_outside(pt.pos):
-                return float('inf')
-            elif self.map_util.is_occupied(pt.pos):
-                return float('inf')
-
+        
+        # Currently, remove the boundary check for sim.
+        # For experiments, can add it back if needed. 
+        # if self.map_util.is_outside(pts_pos):
+            # return float('inf')
+        if self.map_util.is_occupied(pts_pos):
+            return float('inf')
+        # print(f"pts_pos: {pts_pos}")
             # if self.wyaw > 0 and pt.use_yaw:
             #     v = pt.vel[:2]
             #     if np.linalg.norm(v) > 1e-5:
@@ -67,21 +71,18 @@ class EnvMap(EnvBase):
         
         return c
 
-    # TODO: vectorize this
     def get_succ(self, curr, succ, succ_cost, action_idx):
+        # s_time = rospy.Time.now()
         succ.clear()
         succ_cost.clear()
         action_idx.clear()
 
         self.expanded_nodes.append(curr.pos)
         for i, u in enumerate(self.U):
-            p0 = []
-            p0.append(curr.pos[0])
-            p0.append(curr.pos[1])
-            p0.append(curr.vel[0])
-            p0.append(curr.yaw)
+            p0 = [curr.pos[0], curr.pos[1], curr.pos[2], curr.yaw]
+            # primitive = Primitive(p0, u, self.dt, self.primitive_dict.get_element(u))
             primitive = Primitive(p0, u, self.dt)
-            # TODO: we can make this faster by pre-compute the primitive
+
             tn = primitive.evaluate(self.dt)
 
             if tn == curr:
@@ -97,6 +98,8 @@ class EnvMap(EnvBase):
                 self.expanded_edges.append(primitive)
             succ_cost.append(cost)
             action_idx.append(i)
+        e_time = rospy.Time.now()
+        # rospy.loginfo(f"get_succ time: {(e_time - s_time).to_sec()}")
 
     def set_gradient_map(self, map_):
         self.gradient_map = map_
@@ -109,63 +112,6 @@ class EnvMap(EnvBase):
 
     def set_potential_weight(self, weight):
         self.potential_weight = weight
-
-    # def set_prior_trajectory(self, traj):
-    #     self.prior_traj.clear()
-    #     total_time = traj.get_total_time()
-    #     n = int(np.ceil(self.v_max * total_time / self.map_util.get_res()))
-    #     pts = traj.sample(n)
-
-    #     costs = []
-    #     for t in np.arange(0, total_time, self.dt):
-    #         potential_cost = 0
-    #         if self.potential_map:
-    #             prev_idx = -1
-    #             for pt in pts:
-    #                 if pt.t >= t:
-    #                     break
-    #                 pn = self.map_util.float_to_int(pt.pos)
-    #                 idx = self.map_util.get_index(pn)
-    #                 if prev_idx == idx:
-    #                     continue
-    #                 prev_idx = idx
-    #                 potential_cost += self.potential_weight * self.potential_map[idx] + \
-    #                                   self.gradient_weight * np.linalg.norm(pt.vel)
-    #         costs.append(self.w * t + potential_cost)
-    #         print(f"t: {t:.2f}, cost: {costs[-1]:.2f}")
-
-    #     total_cost = self.traverse_trajectory(traj) + self.w * total_time
-    #     print(f"total cost: {total_cost:.2f}")
-
-    #     for t in np.arange(0, total_time, self.dt):
-    #         id_ = int(t / self.dt)
-    #         self.prior_traj.append((traj.evaluate(t), total_cost - costs[id_]))
-
-    #     self.goal_node = traj.evaluate(total_time)
-
-    # def traverse_trajectory(self, traj):
-    #     total_time = traj.get_total_time()
-    #     n = int(np.ceil(self.v_max * total_time / self.map_util.get_res()))
-    #     c = 0.0
-    #     pts = traj.sample(n)
-    #     prev_idx = -1
-    #     for pt in pts:
-    #         pn = self.map_util.float_to_int(pt.pos)
-    #         idx = self.map_util.get_index(pn)
-    #         if prev_idx == idx:
-    #             continue
-    #         prev_idx = idx
-    #         if self.map_util.is_outside(pn):
-    #             return float('inf')
-    #         if self.potential_map:
-    #             if 0 < self.potential_map[idx] < 100:
-    #                 c += self.potential_weight * self.potential_map[idx] + \
-    #                      self.gradient_weight * np.linalg.norm(pt.vel)
-    #             elif self.potential_map[idx] >= 100:
-    #                 return float('inf')
-    #         elif self.map_util.is_occupied(pn):
-    #             return float('inf')
-    #     return c
 
     def info(self):
         print("++++++++++++++++++++ EnvMap ++++++++++++++++++")

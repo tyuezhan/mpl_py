@@ -20,8 +20,8 @@ class Planner:
         self.planner_verbose: bool = verbose
         self.map_util = None
 
-    def setMapUtil(self, map_util):
-        self.ENV = EnvMap(map_util)
+    def setMapUtil(self, map_util, primitive_dict):
+        self.ENV = EnvMap(map_util, primitive_dict)
         print("[MapPlanner] use MPL")
         self.map_util = map_util
 
@@ -54,8 +54,8 @@ class Planner:
             for it in self.ss_ptr.hm_.values():
                 if it and it.pred_coord:
                     for i, key in enumerate(it.pred_coord):
-                        pr = Primitive(self.ENV.get_dt())
-                        self.ENV.forward_action(key, it.pred_action_id[i], pr)
+                        # pr = Primitive(self.ENV.get_dt())
+                        pr = self.ENV.forward_action(key, it.pred_action_id[i])
                         prs.append(pr)
         
         if self.planner_verbose:
