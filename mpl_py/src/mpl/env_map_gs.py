@@ -37,7 +37,7 @@ class EnvMap(EnvBase):
     def traverse_primitive(self, primitive):
         max_v = primitive.max_vel()
         # n = 2 * max(5, int(np.ceil(max_v * primitive.t / self.map_util.get_res())))
-        n = 2
+        n = 5
         c = 0.0
 
         # dt = primitive.t / n
@@ -48,7 +48,6 @@ class EnvMap(EnvBase):
             pts_pos.append(pt.pos)
             # pn = self.map_util.float_to_int(pt.pos)
             # idx = self.map_util.get_index(pn)
-        
         # Currently, remove the boundary check for sim.
         # For experiments, can add it back if needed. 
         # if self.map_util.is_outside(pts_pos):
@@ -68,18 +67,37 @@ class EnvMap(EnvBase):
         #     pos1 = np.array([p0.pos[0], p0.pos[1], 0])
         #     pos2 = np.array([pt.pos[0], pt.pos[1], 0])
         #     c += self.w_view * self.get_view_correlation(pos1, p0.yaw, pos2, pt.yaw)
-        
+        return c
+
+    def vec_traverse_primitive(self, primitives):
+        n = 3
+        c = np.zeros(len(primitives))
+        pts_pos = np.zeros((len(primitives), n, 3))
+        for i, primitive in enumerate(primitives):
+            for j, t in enumerate(np.linspace(0, primitive.t, n)):
+                pt = primitive.evaluate(t)
+                pts_pos[i, j] = pt.pos
+        # for t in np.linspace(0, primitive.t, n):
+        #     # TODO: precompute the primitive will make this faster
+        #     pt = primitive.evaluate(t)
+        #     pts_pos.append(pt.pos)
+        # Currently, remove the boundary check for sim.
+        # For experiments, can add it back if needed. 
+        # if self.map_util.is_outside(pts_pos):
+            # return float('inf')
+        all_collisions = self.map_util.new_is_occupied(pts_pos)
+        all_collisions = all_collisions.detach().cpu().numpy()
+        c[all_collisions] = float('inf')
         return c
 
     def get_succ(self, curr, succ, succ_cost, action_idx):
-        # s_time = rospy.Time.now()
         succ.clear()
         succ_cost.clear()
         action_idx.clear()
 
         self.expanded_nodes.append(curr.pos)
+        p0 = [curr.pos[0], curr.pos[1], curr.pos[2], curr.yaw]
         for i, u in enumerate(self.U):
-            p0 = [curr.pos[0], curr.pos[1], curr.pos[2], curr.yaw]
             # primitive = Primitive(p0, u, self.dt, self.primitive_dict.get_element(u))
             primitive = Primitive(p0, u, self.dt)
 
@@ -98,8 +116,36 @@ class EnvMap(EnvBase):
                 self.expanded_edges.append(primitive)
             succ_cost.append(cost)
             action_idx.append(i)
-        e_time = rospy.Time.now()
-        # rospy.loginfo(f"get_succ time: {(e_time - s_time).to_sec()}")
+
+    def vec_get_succ(self, curr, succ, succ_cost, action_idx):
+        succ.clear()
+        succ_cost.clear()
+        action_idx.clear()
+        # s_time = rospy.Time.now()
+        self.expanded_nodes.append(curr.pos)
+        p0 = [curr.pos[0], curr.pos[1], curr.pos[2], curr.yaw]
+        primitives = []
+        for i, u in enumerate(self.U):
+            # primitive = Primitive(p0, u, self.dt, self.primitive_dict.get_element(u))
+            primitive = Primitive(p0, u, self.dt)
+
+            tn = primitive.evaluate(self.dt)
+
+            if tn == curr:
+                continue
+            tn.t = curr.t + self.dt
+            succ.append(tn)
+            primitives.append(primitive)
+
+        costs = self.vec_traverse_primitive(primitives)
+        for i, cost in enumerate(costs):
+            if not np.isinf(cost):
+                cost += self.calculate_intrinsic_cost(primitives[i])
+                self.expanded_edges.append(primitives[i])
+            succ_cost.append(cost)
+            action_idx.append(i)
+        # e_time = rospy.Time.now()
+        # rospy.loginfo(f"vec_get_succ time: {(e_time - s_time).to_sec()}")
 
     def set_gradient_map(self, map_):
         self.gradient_map = map_

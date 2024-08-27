@@ -48,7 +48,8 @@ class GraphSearch:
                 best_node = curr_node
 
             succ_coord, succ_cost, succ_act_id = [], [], []
-            ENV.get_succ(curr_node.coord, succ_coord, succ_cost, succ_act_id)
+            # ENV.get_succ(curr_node.coord, succ_coord, succ_cost, succ_act_id)
+            ENV.vec_get_succ(curr_node.coord, succ_coord, succ_cost, succ_act_id)
 
             for s, succ in enumerate(succ_coord):
                 if np.isinf(succ_cost[s]):
