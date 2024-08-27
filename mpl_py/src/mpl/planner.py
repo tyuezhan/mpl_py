@@ -7,10 +7,12 @@ from mpl.primitive import Primitive
 from mpl.trajectory import Trajectory
 from mpl.graph_search import GraphSearch
 from mpl.waypoint import Waypoint
-
-
+from scipy.spatial.transform import Rotation as R
+import torch
+import rospy
+from visualization_msgs.msg import Marker, MarkerArray
 class Planner:
-    def __init__(self, verbose: bool = False):
+    def __init__(self, eval_traj_func, verbose: bool = False):
         self.ENV: Optional[EnvBase] = None
         self.ss_ptr: Optional[StateSpace] = None
         self.traj: Trajectory = Trajectory()
@@ -19,6 +21,9 @@ class Planner:
         self.max_num: int = -1
         self.planner_verbose: bool = verbose
         self.map_util = None
+        self.eval_traj_func = eval_traj_func
+        self.debug = False
+        self.prs_pub = rospy.Publisher("/all_candidate_trajs", MarkerArray, queue_size=1)
 
     def setMapUtil(self, map_util, primitive_dict):
         self.ENV = EnvMap(map_util, primitive_dict)
@@ -31,6 +36,12 @@ class Planner:
     def getTraj(self) -> Trajectory:
         return self.traj
     
+    def setWorld2Map(self, world2map):
+        '''
+        world2map should be 4x4 matrix
+        '''
+        self.w2m = world2map
+
     # def getValidPrimitives(self) -> List[Primitive]:
     #     prs = []
     #     if self.ss_ptr:
@@ -233,7 +244,62 @@ class Planner:
         if self.planner_verbose:
             print(f"[PlannerBase] set tol_yaw: {tol_yaw}")
     
-    def plan(self, start: Waypoint, goal: Waypoint) -> bool:
+
+    def traj_to_wps_in_map(self, cost_lst, prs_lst):
+        wps_map = []
+        traj = []
+        cost = []
+        marker_array = MarkerArray()
+        for i in range(len(cost_lst)):
+            if cost_lst[i] != float('inf'):
+                # transform the waypoints to the map frame
+                prs = prs_lst[i]
+                wps = np.zeros((len(prs), 7))
+                for j in range(len(prs)):
+                    pose = prs[j].p(1)
+                    r_world = R.from_euler('z', pose[3], degrees=False).as_matrix()
+                    t_world_homo = np.array([pose[0], pose[1], pose[2], 1])
+                    t_map_homo = np.dot(self.w2m, t_world_homo)
+                    r_map = np.dot(self.w2m[:3, :3], r_world)
+                    quat_map = R.from_matrix(r_map).as_quat()
+                    wps[j][:3] = t_map_homo[:3]
+                    wps[j][3:] = quat_map
+
+                    if self.debug:
+                        # compose the marker array
+                        marker = Marker()
+                        marker.header.frame_id = "map"
+                        marker.header.stamp = rospy.Time.now()
+                        marker.ns = "waypoints"
+                        marker.id = i*len(prs) + j
+                        marker.type = Marker.ARROW
+                        marker.action = Marker.ADD
+                        marker.pose.position.x = t_map_homo[0]
+                        marker.pose.position.y = t_map_homo[1]
+                        marker.pose.position.z = t_map_homo[2]
+                        marker.pose.orientation.x = quat_map[0]
+                        marker.pose.orientation.y = quat_map[1]
+                        marker.pose.orientation.z = quat_map[2]
+                        marker.pose.orientation.w = quat_map[3]
+                        marker.scale.x = 0.05
+                        marker.scale.y = 0.05
+                        marker.scale.z = 0.05
+                        marker.color.a = 1.0
+                        marker.color.r = 0.2 * i
+                        marker.color.g = 0.2 * i
+                        marker.color.b = 0.2 * i
+                        marker_array.markers.append(marker)
+                        
+                wps = torch.tensor(wps)
+                wps_map.append(wps)
+                traj.append(prs)
+                cost.append(cost_lst[i])
+        if self.debug: 
+            self.prs_pub.publish(marker_array)
+        return wps_map, cost, traj
+        
+    
+    def plan(self, start: Waypoint, goal: Waypoint, params, intrinsics) -> bool:
         if self.planner_verbose:
             start.print("Start:")
             goal.print("Goal:")
@@ -255,8 +321,20 @@ class Planner:
         
         if self.ss_ptr:
             self.ss_ptr.dt_ = self.ENV.get_dt()
-            self.traj_cost, prs = planner_ptr.Astar(start, self.ENV, self.ss_ptr, self.traj, self.max_num)
-            self.traj.init_trajectory(prs)
+            # self.traj_cost, prs = planner_ptr.Astar(start, self.ENV, self.ss_ptr, self.traj, self.max_num)
+            traj_cost_lst, prs_lst = planner_ptr.Astar_best_k(start, self.ENV, self.ss_ptr, self.traj, self.max_num)
+            # First, transform all waypoints to the map frame
+            s_time = rospy.Time.now()
+            wps, costs, trajs = self.traj_to_wps_in_map(traj_cost_lst, prs_lst)
+            # Call gaussian gradient cost here
+            utils = self.eval_traj_func(wps, params, intrinsics)
+            # utils = evaluate_trajectories(wps, params, intrinsics)
+            utils = [util.detach().cpu().numpy() for util in utils]
+            best_idx = np.argmin(utils)
+            best_traj = trajs[best_idx]           
+            rospy.loginfo("Eval traj util time: {}".format((rospy.Time.now() - s_time).to_sec()))
+            self.traj.init_trajectory(best_traj)
+            self.traj_cost = costs[best_idx]
         if np.isinf(self.traj_cost):
             if self.planner_verbose:
                 print("[PlannerBase] Cannot find a trajectory!")

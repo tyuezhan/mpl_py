@@ -3,6 +3,7 @@ from mpl.state_space import State
 import heapdict
 import numpy as np
 from mpl.primitive import Primitive
+from collections import deque
 import rospy
 
 class GraphSearch:
@@ -108,6 +109,139 @@ class GraphSearch:
         else:
             return float('inf'), []
         
+
+
+    def Astar_best_k(self, start_coord, ENV, ss, traj, max_expand=-1, best_k=3):
+        ENV.set_plan_start_time()
+
+        if ENV.is_goal(start_coord):
+            return 0, []
+
+        if start_coord not in ss.hm_:
+            curr_node = State(start_coord)
+            curr_node.g = 0
+            if ss.eps_ == 0:
+                curr_node.h = 0
+            else:
+                curr_node.h = ENV.get_heur(start_coord)
+            fval = curr_node.g + ss.eps_ * curr_node.h
+            ss.pq_[curr_node] = fval
+            # curr_node.heapkey = (fval, curr_node)
+            # heapq.heappush(ss.pq_, curr_node.heapkey)
+            curr_node.iterationopened = True
+            ss.hm_[start_coord] = curr_node
+        else:
+            curr_node = ss.hm_[start_coord]
+
+        best_node_list = deque()
+        best_counter = 0
+        goal_node_list = []
+        goal_counter = 0
+        ret_cost_list = []
+        ret_traj_list = []
+        expand_iteration = 0
+        best_dist = float('inf')
+        best_node = curr_node
+        # total_time = 0
+        while ss.pq_:
+            expand_iteration += 1
+            # s_time = rospy.Time.now()
+            # curr_node = heapq.heappop(ss.pq_)[1]
+            curr_node = ss.pq_.popitem()[0]
+            curr_node.iterationclosed = True
+
+            dist_to_goal = ENV.dist_to_goal(curr_node.coord)
+            if dist_to_goal < best_dist:
+                best_dist = dist_to_goal
+                best_node = curr_node
+                best_node_list.append(curr_node)
+                best_counter += 1
+                if best_counter > best_k:
+                    best_node_list.popleft()
+                    best_counter -= 1
+
+            succ_coord, succ_cost, succ_act_id = [], [], []
+            # ENV.get_succ(curr_node.coord, succ_coord, succ_cost, succ_act_id)
+            ENV.vec_get_succ(curr_node.coord, succ_coord, succ_cost, succ_act_id)
+
+            for s, succ in enumerate(succ_coord):
+                if np.isinf(succ_cost[s]):
+                    continue
+
+                if succ not in ss.hm_:
+                    succ_node = State(succ)
+                    succ_node.h = ss.eps_ * ENV.get_heur(succ)
+                    ss.hm_[succ] = succ_node
+                else:
+                    succ_node = ss.hm_[succ]
+
+                succ_node.pred_coord.append(curr_node.coord)
+                succ_node.pred_action_cost.append(succ_cost[s])
+                succ_node.pred_action_id.append(succ_act_id[s])
+
+                tentative_gval = curr_node.g + succ_cost[s]
+
+                if tentative_gval < succ_node.g:
+                    succ_node.g = tentative_gval
+                    fval = succ_node.g + ss.eps_ * succ_node.h
+
+                    if succ_node.iterationopened and not succ_node.iterationclosed:
+                        # succ_node.heapkey = (fval, succ_node)
+                        # heapq.heappush(ss.pq_, succ_node.heapkey)
+                        ss.pq_[succ_node] = fval # update priority
+                    else:
+                        # succ_node.heapkey = (fval, succ_node)
+                        # heapq.heappush(ss.pq_, succ_node.heapkey)
+                        ss.pq_[succ_node] = fval
+                        succ_node.iterationopened = True
+            # print("Iteration time: ", (rospy.Time.now() - s_time).to_sec())
+            # total_time += (rospy.Time.now() - s_time).to_sec()
+            # print("Total time: ", total_time)
+            if ENV.is_goal(curr_node.coord):
+                goal_node_list.append(curr_node)
+                goal_counter += 1
+                if goal_counter >= best_k:
+                    break
+
+            if ENV.plan_timeout():
+                print("Reach Max Search Time!, recover best {} Trajectory!".format(best_counter))
+                for i in range(best_counter):
+                    best_node = best_node_list[i]
+                    find_traj, traj_prs = self.recover_traj(best_node, ss, ENV, start_coord)
+                    if find_traj:
+                        ret_cost_list.append(best_node.g)
+                        ret_traj_list.append(traj_prs)
+                    else:
+                        ret_cost_list.append(float('inf'))
+                        ret_traj_list.append([])
+                return ret_cost_list, ret_traj_list
+                    
+                # find_traj, traj_prs = self.recover_traj(best_node, ss, ENV, start_coord)
+                # return best_node.g, traj_prs
+
+            if max_expand > 0 and expand_iteration >= max_expand:
+                print("MaxExpandStep reached!")
+                return [float('inf')], [[]]
+
+        if self.verbose:
+            fval = ss.calculateKey(curr_node)
+            print(f"goalNode fval: {fval}, g: {curr_node.g}")
+            print(f"Expand {expand_iteration} nodes!")
+
+        ss.expand_iteration_ = expand_iteration
+        for i in range(len(goal_node_list)):
+            curr_node = goal_node_list[i]
+            find_traj, traj_prs = self.recover_traj(curr_node, ss, ENV, start_coord)
+            if find_traj:
+                ret_cost_list.append(curr_node.g)
+                ret_traj_list.append(traj_prs)
+                # return curr_node.g, traj_prs
+            else:
+                ret_cost_list.append(float('inf'))
+                ret_traj_list.append([])
+                # return float('inf'), []
+        return ret_cost_list, ret_traj_list
+
 
     def recover_traj(self, curr_node, ss, ENV, start_key):
         print("--------------------------------------------")

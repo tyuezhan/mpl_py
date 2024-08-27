@@ -26,7 +26,7 @@ from planning_ros_msgs.msg import Trajectory
 
 class LocalPlanner:
 
-    def __init__(self):
+    def __init__(self, eval_traj_func):
         # rospy.init_node("mpl_planner_test")
         self.odom_pos_ = np.zeros(3)
         self.odom_vel_ = np.zeros(3)
@@ -50,6 +50,8 @@ class LocalPlanner:
         self.map_set_ = False
         self.odom_init_ = False
         self.debug = False
+        self.map2world = None
+        self.world2map = None
         self.pc_fields_ = self.make_fields()
 
         # Compute U
@@ -62,7 +64,7 @@ class LocalPlanner:
         print("Control:", self.U)
 
         # set planner
-        self.planner = Planner()
+        self.planner = Planner(eval_traj_func)
         self.primitive_dict = PrimitiveDict(5, self.U)
         self.primitive_dict.precompute()
         self.map_util = MapUtil(self.x_min, self.x_max, self.y_min, self.y_max, self.robot_radius_)
@@ -91,46 +93,50 @@ class LocalPlanner:
 
 
     def set_map(self, means, radius_log):
-        # It should contain at least means3D and radius
-        # lookup the TF between map frame and the world frame
-        try:
-            # Lookup the static transform
-            source_frame = 'world'
-            target_frame = 'map'
-            transform = self.tf_buffer.lookup_transform(source_frame, target_frame, rospy.Time(0))
-            # Print out the transform details
-            rospy.loginfo(f"Transform from {source_frame} to {target_frame}:")
-            rospy.loginfo(f"Translation: {transform.transform.translation.x}, {transform.transform.translation.y}, {transform.transform.translation.z}")
-            rospy.loginfo(f"Rotation: {transform.transform.rotation.x}, {transform.transform.rotation.y}, {transform.transform.rotation.z}, {transform.transform.rotation.w}")
-        except tf2_ros.LookupException as e:
-            rospy.logerr(f"Transform lookup failed: {e}")
-        except tf2_ros.ConnectivityException as e:
-            rospy.logerr(f"Transform connectivity issue: {e}")
-        except tf2_ros.ExtrapolationException as e:
-            rospy.logerr(f"Transform extrapolation issue: {e}")
-        
-        self.map = {}
-        # Apply tf to means
-        # check means device
-        print(means.device)
-        # use torch to apply the transform
-        # create H from the transform
-        map2world = np.eye(4)
-        map2world[:3, :3] = R.from_quat([
-            transform.transform.rotation.x,
-            transform.transform.rotation.y,
-            transform.transform.rotation.z,
-            transform.transform.rotation.w
-        ]).as_matrix()
-        map2world[:3, 3] = [
-            transform.transform.translation.x,
-            transform.transform.translation.y,
-            transform.transform.translation.z
-        ]
-        map2world = torch.tensor(map2world, dtype=torch.float32).to(means.device)
+        if self.map2world is None:
+            # It should contain at least means3D and radius
+            # lookup the TF between map frame and the world frame
+            try:
+                # Lookup the static transform
+                source_frame = 'world'
+                target_frame = 'map'
+                transform = self.tf_buffer.lookup_transform(source_frame, target_frame, rospy.Time(0))
+                # Print out the transform details
+                rospy.loginfo(f"Transform from {source_frame} to {target_frame}:")
+                rospy.loginfo(f"Translation: {transform.transform.translation.x}, {transform.transform.translation.y}, {transform.transform.translation.z}")
+                rospy.loginfo(f"Rotation: {transform.transform.rotation.x}, {transform.transform.rotation.y}, {transform.transform.rotation.z}, {transform.transform.rotation.w}")
+            except tf2_ros.LookupException as e:
+                rospy.logerr(f"Transform lookup failed: {e}")
+                return
+            except tf2_ros.ConnectivityException as e:
+                rospy.logerr(f"Transform connectivity issue: {e}")
+                return
+            except tf2_ros.ExtrapolationException as e:
+                rospy.logerr(f"Transform extrapolation issue: {e}")
+                return
+            
+            self.map = {}
+            # Apply tf to means
+            # check means device
+            print(means.device)
+            # use torch to apply the transform
+            # create H from the transform
+            map2world = np.eye(4)
+            map2world[:3, :3] = R.from_quat([
+                transform.transform.rotation.x,
+                transform.transform.rotation.y,
+                transform.transform.rotation.z,
+                transform.transform.rotation.w
+            ]).as_matrix()
+            map2world[:3, 3] = [
+                transform.transform.translation.x,
+                transform.transform.translation.y,
+                transform.transform.translation.z
+            ]
+            self.map2world = torch.tensor(map2world, dtype=torch.float32).to(means.device)
         # Make means homogeneous
         means = torch.cat([means, torch.ones(means.shape[0], 1, device=means.device)], dim=1)
-        means_w = torch.matmul(map2world, means.t()).t()[:, :3]
+        means_w = torch.matmul(self.map2world, means.t()).t()[:, :3]
 
         self.map["means3D"] = means_w
         self.map["radius"] = torch.exp(radius_log)
@@ -162,20 +168,24 @@ class LocalPlanner:
         self.goal_.pos = np.array([msg.pose.position.x, msg.pose.position.y, msg.pose.position.z])
         self.goal_.yaw = 0
 
-        self.plan_traj(self.start_, self.goal_)
+        # self.plan_traj(self.start_, self.goal_, params, intrinsics)
 
 
-    def plan_traj(self, start, goal):
+    def plan_traj(self, start, goal, params, intrinsics):
         if not self.odom_init_:
             rospy.logwarn("No odometry!")
             return
         if not self.map_set_:
             rospy.logwarn("No map!")
             return
+        if not self.find_world2map():
+            rospy.logwarn("No world2map!")
+            return
+        
         rospy.loginfo("Called plan traj!")
 
         t0 = rospy.Time.now()
-        valid = self.planner.plan(start, goal)
+        valid = self.planner.plan(start, goal, params, intrinsics)
         if not valid:
             if self.planner.initialized():
                 rospy.logerr("Failed! Takes {} sec for planning, expand {} nodes".format((rospy.Time.now() - t0).to_sec(),
@@ -242,6 +252,46 @@ class LocalPlanner:
             return 0
 
 
+    def find_world2map(self):
+        if self.world2map is not None:
+            return True
+        # It should contain at least means3D and radius
+        # lookup the TF between map frame and the world frame
+        try:
+            # Lookup the static transform
+            source_frame = 'map'
+            target_frame = 'world'
+            transform = self.tf_buffer.lookup_transform(source_frame, target_frame, rospy.Time(0))
+            # Print out the transform details
+            rospy.loginfo(f"Transform from {source_frame} to {target_frame}:")
+            rospy.loginfo(f"Translation: {transform.transform.translation.x}, {transform.transform.translation.y}, {transform.transform.translation.z}")
+            rospy.loginfo(f"Rotation: {transform.transform.rotation.x}, {transform.transform.rotation.y}, {transform.transform.rotation.z}, {transform.transform.rotation.w}")
+        except tf2_ros.LookupException as e:
+            rospy.logerr(f"Transform lookup failed: {e}")
+            return False
+        except tf2_ros.ConnectivityException as e:
+            rospy.logerr(f"Transform connectivity issue: {e}")
+            return False
+        except tf2_ros.ExtrapolationException as e:
+            rospy.logerr(f"Transform extrapolation issue: {e}")
+            return False
+        # create H from the transform
+        self.world2map = np.eye(4)
+        self.world2map[:3, :3] = R.from_quat([
+            transform.transform.rotation.x,
+            transform.transform.rotation.y,
+            transform.transform.rotation.z,
+            transform.transform.rotation.w
+        ]).as_matrix()
+        self.world2map[:3, 3] = [
+            transform.transform.translation.x,
+            transform.transform.translation.y,
+            transform.transform.translation.z
+        ]
+        self.planner.setWorld2Map(self.world2map)
+        return True
+        
+
     def make_fields(self):
         fields = []
         field = PointField()
@@ -286,11 +336,11 @@ class LocalPlanner:
         rospy.loginfo(f"[MPL planner] Published Map! Time: {(e_time-s_time).to_sec()} s")
 
 
-    def test_plan(self):
+    def test_plan(self, params, intrinsics):
         self.start_.pos = self.odom_pos_
         self.start_.yaw = self.odom_yaw_
 
         self.goal_.pos = np.array([2, 2, 0])
         self.goal_.yaw = 0
 
-        self.plan_traj(self.start_, self.goal_)
+        self.plan_traj(self.start_, self.goal_, params, intrinsics)
