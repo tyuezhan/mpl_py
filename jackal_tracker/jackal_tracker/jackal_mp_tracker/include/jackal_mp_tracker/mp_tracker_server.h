@@ -28,22 +28,39 @@ class PIDController {
               kp_, ki_, kd_, max_i_, max_output_);
   }
 
-  double compute(double error, double dt) {
+  double compute(double error, double dt, int error_sign) {
     error_integral_ += error * dt;
     if (error_integral_ > max_i_) {
       error_integral_ = max_i_;
     } else if (error_integral_ < -max_i_) {
       error_integral_ = -max_i_;
     }
+    ROS_INFO("error: %f, error_integral: %f, error_prev: %f", error, error_integral_, error_prev_);
+    if (dt < 1e-6) {
+      ROS_WARN("dt is too small, p only");
+      return kp_ * error;
+    }
+    double diff_term = (error - error_prev_) / dt;
+    ROS_INFO("diff_term: %f", diff_term);
+    ROS_INFO("dt: %f", dt);
 
-    double output = kp_ * error + ki_ * error_integral_ + kd_ * (error - error_prev_) / dt;
+    double output = kp_ * error + ki_ * error_integral_ + kd_ * diff_term;
+    ROS_INFO("output before cutoff: %f", output);
     if (output > max_output_) {
       output = max_output_;
     } else if (output < -max_output_) {
       output = -max_output_;
     }
-
+    ROS_INFO("max_output: %f", max_output_);
     error_prev_ = error;
+    ROS_INFO("output: %f", output);
+    if (error_sign == 1) {
+      return output;
+    } else if (error_sign == -1) {
+      return -output;
+    } else {
+      return 0;
+    }
     return output;
   }
 
@@ -112,6 +129,7 @@ class MPTrackerServer {
   bool active_;
   ros::Time traj_start_, t_prev_;
   Eigen::Vector3d current_pos_;
+  Eigen::Quaterniond current_orient_;
   double current_yaw_;
   double v_kp_, v_ki_, v_kd_, v_max_i_, v_max_;
   double w_kp_, w_ki_, w_kd_, w_max_i_, w_max_;
@@ -131,7 +149,8 @@ class MPTrackerServer {
   // double error_integral_;
   // Use command struct from mpl to query trajectory
   Command3D last_traj_cmd_;
-
+  // Reverse traj
+  bool reverse_traj_;
   std::unique_ptr<PIDController> linear_controller_;
   std::unique_ptr<PIDController> angular_controller_;
 };

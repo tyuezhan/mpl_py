@@ -198,6 +198,9 @@ void MPTrackerServer::trackerGoalCB() {
   current_traj_length_ = 0.0;
   linear_controller_->resetError();
   angular_controller_->resetError();
+
+  // Set reverse
+  reverse_traj_ = goal->reverse;
 }
 
 void MPTrackerServer::preemptCb_() {
@@ -228,32 +231,88 @@ void MPTrackerServer::toTrajectory3D(const planning_ros_msgs::Trajectory& traj_m
   traj_.reset(new Trajectory3D());
 
   traj_->taus.push_back(0);
-  for (const auto& it : traj_msg.primitives) {
-    ROS_INFO("primitive type: %d", it.control_car);
-    traj_->segs.push_back(toPrimitive3D(it));
-    traj_->taus.push_back(traj_->taus.back() + it.t);
+  // If not reverse:
+  if (!reverse_traj_) {
+    for (const auto& it : traj_msg.primitives) {
+      ROS_INFO("primitive type: %d", it.control_car);
+      traj_->segs.push_back(toPrimitive3D(it));
+      traj_->taus.push_back(traj_->taus.back() + it.t);
+    }
+
+    if (!traj_msg.lambda.empty()) {
+      Lambda l;
+      for (int i = 0; i < (int)traj_msg.lambda.size(); i++) {
+        LambdaSeg seg;
+        seg.a(0) = traj_msg.lambda[i].ca[0];
+        seg.a(1) = traj_msg.lambda[i].ca[1];
+        seg.a(2) = traj_msg.lambda[i].ca[2];
+        seg.a(3) = traj_msg.lambda[i].ca[3];
+        seg.ti = traj_msg.lambda[i].ti;
+        seg.tf = traj_msg.lambda[i].tf;
+        seg.dT = traj_msg.lambda[i].dT;
+        l.segs.push_back(seg);
+        traj_->total_t_ += seg.dT;
+      }
+      traj_->lambda_ = l;
+      std::vector<decimal_t> ts;
+      for (const auto& tau : traj_->taus) ts.push_back(traj_->lambda_.getT(tau));
+      traj_->Ts = ts;
+    } else
+      traj_->total_t_ = traj_->taus.back();
+  } else {
+    // If reverse:
+    int seg_id = 0;
+    int closest_seg_id = 0;
+    double closest_dist = std::numeric_limits<double>::max();
+    // 1. Identify which is the closest segment end in the previous traj
+    for (const auto& it : traj_msg.primitives) {
+      ROS_INFO("primitive type: %d", it.control_car);
+      // In reverse case, check the closest point of current odom to the segment
+      Eigen::Vector3d p(current_pos_(0), current_pos_(1), current_pos_(2));
+      auto seg = toPrimitive3D(it);
+      Waypoint3D seg_end = seg.evaluate(1.0);
+      Eigen::Vector3d seg_end_p(seg_end.pos(0), seg_end.pos(1), seg_end.pos(2));
+      // Keep distance to seg_end
+      double tmp_dist = (seg_end_p - p).norm();
+      if (tmp_dist < closest_dist) {
+        closest_dist = tmp_dist;
+        closest_seg_id = seg_id;
+      }
+      seg_id ++;
+    }
+    ROS_ERROR("closest_seg_id: %d", closest_seg_id);
+    // Add the segments up to the closest seg
+    seg_id = 0;
+    for (const auto& it : traj_msg.primitives) {
+      if (seg_id > closest_seg_id) break;
+      traj_->segs.push_back(toPrimitive3D(it));
+      traj_->taus.push_back(traj_->taus.back() + it.t);
+      seg_id ++;
+    }
+    // Add time up to the closest seg
+    if (!traj_msg.lambda.empty()) {
+      Lambda l;
+      for (int i = 0; i <= closest_seg_id; i++) {
+        LambdaSeg seg;
+        seg.a(0) = traj_msg.lambda[i].ca[0];
+        seg.a(1) = traj_msg.lambda[i].ca[1];
+        seg.a(2) = traj_msg.lambda[i].ca[2];
+        seg.a(3) = traj_msg.lambda[i].ca[3];
+        seg.ti = traj_msg.lambda[i].ti;
+        seg.tf = traj_msg.lambda[i].tf;
+        seg.dT = traj_msg.lambda[i].dT;
+        l.segs.push_back(seg);
+        traj_->total_t_ += seg.dT;
+      }
+      traj_->lambda_ = l;
+      std::vector<decimal_t> ts;
+      for (const auto& tau : traj_->taus) ts.push_back(traj_->lambda_.getT(tau));
+      traj_->Ts = ts;
+    } else
+      traj_->total_t_ = traj_->taus.back();
+      ROS_ERROR("total_t_: %f", traj_->total_t_);
   }
 
-  if (!traj_msg.lambda.empty()) {
-    Lambda l;
-    for (int i = 0; i < (int)traj_msg.lambda.size(); i++) {
-      LambdaSeg seg;
-      seg.a(0) = traj_msg.lambda[i].ca[0];
-      seg.a(1) = traj_msg.lambda[i].ca[1];
-      seg.a(2) = traj_msg.lambda[i].ca[2];
-      seg.a(3) = traj_msg.lambda[i].ca[3];
-      seg.ti = traj_msg.lambda[i].ti;
-      seg.tf = traj_msg.lambda[i].tf;
-      seg.dT = traj_msg.lambda[i].dT;
-      l.segs.push_back(seg);
-      traj_->total_t_ += seg.dT;
-    }
-    traj_->lambda_ = l;
-    std::vector<decimal_t> ts;
-    for (const auto& tau : traj_->taus) ts.push_back(traj_->lambda_.getT(tau));
-    traj_->Ts = ts;
-  } else
-    traj_->total_t_ = traj_->taus.back();
 }
 
 void MPTrackerServer::update() {
@@ -287,6 +346,7 @@ void MPTrackerServer::update() {
                                     current_pos_(1) - odom_pos_(1)).norm();
 
   current_pos_ = odom_pos_;
+  current_orient_ = odom_orient_;
   current_yaw_ = odom_yaw_;
 
   current_traj_length_ += ds;
@@ -299,25 +359,7 @@ void MPTrackerServer::update() {
     // TODO: Debug when we will enter this condition
     cmd_vel.linear.x = 0;
     cmd_vel.angular.z = 0;
-    // Eigen::Vector3d x_last = Eigen::Vector3d(
-    //     last_traj_cmd_.pos(0), last_traj_cmd_.pos(1), last_traj_cmd_.pos(2));
-    // // Calculate the difference between the current pose and the desired pose
-    // double dx = x_last(0) - current_pos_(0);
-    // double dy = x_last(1) - current_pos_(1);
-    // double yaw_des = last_traj_cmd_.yaw;
-    // // double yaw_last = angleToNextPoint(current_pos_, x_last);
-    // double dtheta = shortestAngularDistance(current_yaw_, yaw_des);
 
-    // // compute v_l and v_w
-    // double error_v = sqrt(dx * dx + dy * dy);
-    // cmd_vel.linear.x = linear_controller_->compute(error_v, (t_now - t_prev_).toSec());
-    // cmd_vel.angular.z = angular_controller_->compute(dtheta, (t_now - t_prev_).toSec());
-    // // Trick to handle a waypoint that is backward
-    // if (dtheta > M_PI / 2 || dtheta < -M_PI / 2) {
-    //   cmd_vel.linear.x = 0;
-    // }
-    // // cmd_vel.linear.x = kv_ * sqrt(dx * dx + dy * dy);
-    // // cmd_vel.angular.z = kw_ * dtheta;
     ROS_INFO("cmd_vel.linear.x: %f, cmd_vel.angular.z: %f", cmd_vel.linear.x, cmd_vel.angular.z);
     jackal_tracker_msgs::JackalMPTrackerResult result;
     result.total_time = traj_total_time_;
@@ -328,32 +370,13 @@ void MPTrackerServer::update() {
     return;
   }
 
-  const double traj_time = (t_now - traj_start_).toSec();
+  double traj_time = (t_now - traj_start_).toSec();
   if (traj_time >= traj_total_time_)  // Reached goal
   {
-    ROS_INFO("Reached goal");
+    ROS_WARN("[MPTrackerServer] Trajectory finished.");
     Eigen::Vector3d x;
-    // x(0) = last_traj_cmd_.pos(0);
-    // x(1) = last_traj_cmd_.pos(1);
-    // x(2) = last_traj_cmd_.pos(2);
-    // double yaw_des = last_traj_cmd_.yaw;
-    // double yaw_des = angleToNextPoint(current_pos_, x);
-    // double dtheta = shortestAngularDistance(current_yaw_, yaw_des);
-    // double dx = x(0) - current_pos_(0);
-    // double dy = x(1) - current_pos_(1);
-    // double error_v = sqrt(dx * dx + dy * dy);
     cmd_vel.linear.x = 0;
     cmd_vel.angular.z = 0;
-
-    // cmd_vel.linear.x = linear_controller_->compute(error_v, (t_now - t_prev_).toSec());
-    // cmd_vel.angular.z = angular_controller_->compute(dtheta, (t_now - t_prev_).toSec());
-    // Trick to handle a waypoint that is backward
-    // ROS_INFO("dtheta: %f", dtheta);
-    // if (dtheta > M_PI / 2 || dtheta < -M_PI / 2) {
-    //   cmd_vel.linear.x = 0;
-    // }
-    // cmd_vel.linear.x = kv_ * sqrt(dx * dx + dy * dy);
-    // cmd_vel.angular.z = kw_ * dtheta;
     cmd_vel_pub_.publish(cmd_vel);
     ROS_INFO("cmd_vel.linear.x: %f, cmd_vel.angular.z: %f", cmd_vel.linear.x, cmd_vel.angular.z);
 
@@ -365,34 +388,65 @@ void MPTrackerServer::update() {
     mp_tracker_server_ptr_->setSucceeded(result);
   } else if (traj_time >= 0) {
     Command3D next_cmd;
+    // Handle reverse cases
+    if (reverse_traj_) {
+      traj_time = traj_total_time_ - traj_time;
+    }
     traj_->evaluate(traj_time, next_cmd);
     Eigen::Vector3d x;
     x(0) = next_cmd.pos(0);
     x(1) = next_cmd.pos(1);
     x(2) = next_cmd.pos(2);
+    // linear velocity magnitude
     double traj_vel = sqrt(next_cmd.vel(0)*next_cmd.vel(0) + next_cmd.vel(1)*next_cmd.vel(1));
     double yaw_vel = next_cmd.yaw_dot;
-    ROS_INFO("Traj vel: %f, Yaw vel: ", traj_vel, yaw_vel);
+    ROS_INFO("Traj vel: %f, Yaw vel: %f", traj_vel, yaw_vel);
+
+    // Find the desired position in body frame
+    // Take odom and construct H
+    Eigen::Vector3d p(current_pos_(0), current_pos_(1), current_pos_(2));
+    Eigen::Matrix3d R = current_orient_.toRotationMatrix();
+    Eigen::Matrix4d H_b2w = Eigen::Matrix4d::Identity();
+    H_b2w.block<3, 3>(0, 0) = R;
+    H_b2w.block<3, 1>(0, 3) = p;
+    Eigen::Vector4d x_world(x(0), x(1), x(2), 1);
+    Eigen::Vector4d x_body = H_b2w.inverse() * x_world;
+    int pos_error_sign = 1;
+    // if x(0) is negative, it means the point is behind the robot, error sign is -1.
+    if (x_body(0) < 0) {
+      pos_error_sign = -1;
+    } else if (x_body(0) == 0) {
+      pos_error_sign = 0;
+    }
+
     double dx = x(0) - current_pos_(0);
     double dy = x(1) - current_pos_(1);
     double yaw_des = next_cmd.yaw;
     // double yaw_des = angleToNextPoint(current_pos_, x);
     ROS_INFO("current yaw: %f, des yaw: %f", current_yaw_, yaw_des);
-    double dtheta = shortestAngularDistance(current_yaw_, yaw_des);
-    double error_v = sqrt(dx * dx + dy * dy);
+    double error_yaw = shortestAngularDistance(current_yaw_, yaw_des);
+    ROS_WARN("Error yaw: %f", error_yaw);
+
+    // double error_v = sqrt(dx * dx + dy * dy);
     // Find angle between heading and the error vector
-    double error_angle = atan2(dy, dx);
-    double angle_diff = shortestAngularDistance(current_yaw_, error_angle);
-    if (angle_diff > M_PI / 2 || angle_diff < -M_PI / 2) {
-      error_v = -error_v;
+    // double error_angle = atan2(dy, dx);
+    // double angle_diff = shortestAngularDistance(current_yaw_, error_angle);
+    // if (angle_diff > M_PI / 2 || angle_diff < -M_PI / 2) {
+    //   error_v = -error_v;
+    // }
+    double error_pos = sqrt(dx * dx + dy * dy);
+
+    ROS_WARN("Before adding controller output: v: %f, w: %f", traj_vel, yaw_vel);
+    if (reverse_traj_) {
+      // 1. the original traj_vel needs to be flipped (we go reverse direction)
+      // 2. position error sign needs to be flipped
+      cmd_vel.linear.x = -traj_vel + linear_controller_->compute(error_pos, (t_now - t_prev_).toSec(), -pos_error_sign);
+      cmd_vel.angular.z = -yaw_vel + angular_controller_->compute(error_yaw, (t_now - t_prev_).toSec(), -1);
+    } else {
+      cmd_vel.linear.x = traj_vel + linear_controller_->compute(error_pos, (t_now - t_prev_).toSec(), pos_error_sign);
+      cmd_vel.angular.z = yaw_vel + angular_controller_->compute(error_yaw, (t_now - t_prev_).toSec(), 1);
     }
-    cmd_vel.linear.x = traj_vel + linear_controller_->compute(error_v, (t_now - t_prev_).toSec());
-    cmd_vel.angular.z = yaw_vel + angular_controller_->compute(dtheta, (t_now - t_prev_).toSec());
-    // Trick to handle a waypoint that is backward
-    ROS_INFO("dtheta: %f", dtheta);
-    if (dtheta > M_PI / 2 || dtheta < -M_PI / 2) {
-      cmd_vel.linear.x = 0;
-    }
+
     // cmd_vel.linear.x = kv_ * sqrt(dx * dx + dy * dy);
     // cmd_vel.angular.z = kw_ * dtheta;
     cmd_vel_pub_.publish(cmd_vel);

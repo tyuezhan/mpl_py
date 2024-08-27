@@ -1,6 +1,7 @@
 #goal definition
 Header header
 planning_ros_msgs/Trajectory trajectory
+bool reverse
 ---
 #result definition
 float64 total_time
