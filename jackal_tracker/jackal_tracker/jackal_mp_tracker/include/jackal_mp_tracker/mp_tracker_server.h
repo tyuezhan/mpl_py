@@ -24,7 +24,7 @@ class PIDController {
       : kp_(kp), ki_(ki), kd_(kd), max_i_(max_i), max_output_(max_output) {
     error_prev_ = 0.0;
     error_integral_ = 0.0;
-    ROS_ERROR("Init PID Controller with kp: %f, ki: %f, kd: %f, max_i: %f, max_output: %f",
+    ROS_INFO("Init PID Controller with kp: %f, ki: %f, kd: %f, max_i: %f, max_output: %f",
               kp_, ki_, kd_, max_i_, max_output_);
   }
 
@@ -35,25 +35,25 @@ class PIDController {
     } else if (error_integral_ < -max_i_) {
       error_integral_ = -max_i_;
     }
-    ROS_INFO("error: %f, error_integral: %f, error_prev: %f", error, error_integral_, error_prev_);
+    // ROS_INFO("error: %f, error_integral: %f, error_prev: %f", error, error_integral_, error_prev_);
     if (dt < 1e-6) {
       ROS_WARN("dt is too small, p only");
       return kp_ * error;
     }
     double diff_term = (error - error_prev_) / dt;
-    ROS_INFO("diff_term: %f", diff_term);
-    ROS_INFO("dt: %f", dt);
+    // ROS_INFO("diff_term: %f", diff_term);
+    // ROS_INFO("dt: %f", dt);
 
     double output = kp_ * error + ki_ * error_integral_ + kd_ * diff_term;
-    ROS_INFO("output before cutoff: %f", output);
+    // ROS_INFO("output before cutoff: %f", output);
     if (output > max_output_) {
       output = max_output_;
     } else if (output < -max_output_) {
       output = -max_output_;
     }
-    ROS_INFO("max_output: %f", max_output_);
+    // ROS_INFO("max_output: %f", max_output_);
     error_prev_ = error;
-    ROS_INFO("output: %f", output);
+    // ROS_INFO("output: %f", output);
     if (error_sign == 1) {
       return output;
     } else if (error_sign == -1) {

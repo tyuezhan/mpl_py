@@ -183,6 +183,7 @@ void MPTrackerServer::trackerGoalCB() {
   // Save new trajectory into traj_
   toTrajectory3D(goal->trajectory);
   traj_start_ = ros::Time::now();
+  t_prev_ = traj_start_;
   traj_total_time_ = traj_->getTotalTime();
   bool ret = traj_->evaluate(traj_total_time_, last_traj_cmd_);
   if (!ret) ROS_ERROR("evaluate traj failed");
@@ -234,7 +235,11 @@ void MPTrackerServer::toTrajectory3D(const planning_ros_msgs::Trajectory& traj_m
   // If not reverse:
   if (!reverse_traj_) {
     for (const auto& it : traj_msg.primitives) {
-      ROS_INFO("primitive type: %d", it.control_car);
+      // ROS_INFO("primitive type: %d", it.control_car);
+      // auto seg = toPrimitive3D(it);
+      // Vec2f U = seg.pr_car().coeff();
+      // ROS_ERROR("seg_control: %f, %f", U(0), U(1));
+      Waypoint3D seg_end = seg.evaluate(1.0);
       traj_->segs.push_back(toPrimitive3D(it));
       traj_->taus.push_back(traj_->taus.back() + it.t);
     }
@@ -371,6 +376,8 @@ void MPTrackerServer::update() {
   }
 
   double traj_time = (t_now - traj_start_).toSec();
+  ROS_INFO("Traj time: %f. Total time: %f", traj_time, traj_total_time_);
+
   if (traj_time >= traj_total_time_)  // Reached goal
   {
     ROS_WARN("[MPTrackerServer] Trajectory finished.");
@@ -423,9 +430,9 @@ void MPTrackerServer::update() {
     double dy = x(1) - current_pos_(1);
     double yaw_des = next_cmd.yaw;
     // double yaw_des = angleToNextPoint(current_pos_, x);
-    ROS_INFO("current yaw: %f, des yaw: %f", current_yaw_, yaw_des);
+    // ROS_INFO("current yaw: %f, des yaw: %f", current_yaw_, yaw_des);
     double error_yaw = shortestAngularDistance(current_yaw_, yaw_des);
-    ROS_WARN("Error yaw: %f", error_yaw);
+    // ROS_WARN("Error yaw: %f", error_yaw);
 
     // double error_v = sqrt(dx * dx + dy * dy);
     // Find angle between heading and the error vector
@@ -436,7 +443,7 @@ void MPTrackerServer::update() {
     // }
     double error_pos = sqrt(dx * dx + dy * dy);
 
-    ROS_WARN("Before adding controller output: v: %f, w: %f", traj_vel, yaw_vel);
+    // ROS_WARN("Before adding controller output: v: %f, w: %f", traj_vel, yaw_vel);
     if (reverse_traj_) {
       // 1. the original traj_vel needs to be flipped (we go reverse direction)
       // 2. position error sign needs to be flipped
