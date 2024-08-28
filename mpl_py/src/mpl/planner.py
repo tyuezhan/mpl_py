@@ -326,9 +326,10 @@ class Planner:
             # First, transform all waypoints to the map frame
             s_time = rospy.Time.now()
             wps, costs, trajs = self.traj_to_wps_in_map(traj_cost_lst, prs_lst)
+            if len(wps) == 0:
+                return False
             # Call gaussian gradient cost here
             utils = self.eval_traj_func(wps, params, intrinsics)
-            # utils = evaluate_trajectories(wps, params, intrinsics)
             utils = [util.detach().cpu().numpy() for util in utils]
             best_idx = np.argmin(utils)
             best_traj = trajs[best_idx]           

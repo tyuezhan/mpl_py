@@ -41,7 +41,7 @@ class LocalPlanner:
         self.y_max = 10
         self.v_max = 0.5
         self.a_max = 0.5
-        self.yaw_max = 0.628
+        self.yaw_max = 0.314
         self.dt = 1.0
         self.goal_tolerance_ = 0.5
         self.yaw_tolerance_ = 3.14
@@ -193,8 +193,10 @@ class LocalPlanner:
             else:
                 rospy.logerr("Failed! Takes {} sec for planning".format((rospy.Time.now() - t0).to_sec()))
             # cancel goal
-            self.tracker_client.cancel_goal()
-            rospy.loginfo("Cancel goal!")
+            # check if the tracker is active
+            if self.tracker_client.get_state() == 1:
+                self.tracker_client.cancel_goal()
+                rospy.loginfo("Cancel goal!")
             # Publish empty trajectory
             prs_msg = PrimitiveArray()
             prs_msg.header.stamp = t0
@@ -221,6 +223,10 @@ class LocalPlanner:
             prs_msg = to_primitive_array_ros_msg(traj.get_primitives())
             prs_msg.header = header
             self.prs_pub_.publish(prs_msg)
+
+            #DEBUG:
+            # for pr in traj.get_primitives():
+            #     print("control:", pr.u())
 
             # Publish goal
             traj_msg = to_trajectory_ros_msg(traj)
