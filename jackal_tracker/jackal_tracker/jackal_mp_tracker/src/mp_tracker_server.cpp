@@ -239,7 +239,7 @@ void MPTrackerServer::toTrajectory3D(const planning_ros_msgs::Trajectory& traj_m
       // auto seg = toPrimitive3D(it);
       // Vec2f U = seg.pr_car().coeff();
       // ROS_ERROR("seg_control: %f, %f", U(0), U(1));
-      Waypoint3D seg_end = seg.evaluate(1.0);
+      // Waypoint3D seg_end = seg.evaluate(1.0);
       traj_->segs.push_back(toPrimitive3D(it));
       traj_->taus.push_back(traj_->taus.back() + it.t);
     }
