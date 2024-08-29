@@ -44,7 +44,7 @@ class LocalPlanner:
         self.yaw_max = 0.314
         self.dt = 1.0
         self.goal_tolerance_ = 0.5
-        self.yaw_tolerance_ = 3.14
+        self.yaw_tolerance_ = 0.8
         self.robot_radius_ = 0.1
         self.num = 1
         self.map_set_ = False
@@ -53,6 +53,8 @@ class LocalPlanner:
         self.map2world = None
         self.world2map = None
         self.pc_fields_ = self.make_fields()
+        self.prev_traj_ = None
+        self.last_plan_success_ = False
 
         # Compute U
         # du = 0.8 * self.v_max / (2*self.num)
@@ -79,11 +81,13 @@ class LocalPlanner:
         self.planner.setTolYaw(self.yaw_tolerance_)
         self.planner.setPlanTmax(1.0)
 
+        self.odom_topic = rospy.get_param("~odom_topic", "/ground_truth/husky/odom")
         self.cloud_pub_ = rospy.Publisher("mpl/cloud", PointCloud, queue_size=1)
         self.prs_pub_ = rospy.Publisher("mpl/primitives", PrimitiveArray, queue_size=1)
         self.map_pub_ = rospy.Publisher("mpl/map", PointCloud2, queue_size=1)
         self.plan_sub_ = rospy.Subscriber("/move_base_simple/goal", PoseStamped, self.plan_cb, queue_size=1)
-        self.odom_sub_ = rospy.Subscriber("/ground_truth/husky/odom", Odometry, self.odom_cb, queue_size=1)
+        self.odom_sub_ = rospy.Subscriber(self.odom_topic, Odometry, self.odom_cb, queue_size=1)
+        self.goal_pub_ = rospy.Publisher("mpl/goal", PoseStamped, queue_size=1)
         # TF
         self.tf_buffer = tf2_ros.Buffer()
         self.tf_listener = tf2_ros.TransformListener(self.tf_buffer)
@@ -202,6 +206,7 @@ class LocalPlanner:
             prs_msg.header.stamp = t0
             prs_msg.header.frame_id = "world"
             self.prs_pub_.publish(prs_msg)
+            self.last_plan_success_ = False
 
         else:
             rospy.loginfo("Succeed! Takes {} sec for planning, expand {} nodes".format(
@@ -212,6 +217,8 @@ class LocalPlanner:
                 return 0
 
             traj = self.planner.getTraj()
+            self.prev_traj_ = traj
+            self.last_plan_success_ = True
             plan_stime_ = rospy.Time.now()
 
             # Publish trajectory
@@ -342,11 +349,51 @@ class LocalPlanner:
         rospy.loginfo(f"[MPL planner] Published Map! Time: {(e_time-s_time).to_sec()} s")
 
 
-    def test_plan(self, params, intrinsics):
-        self.start_.pos = self.odom_pos_
-        self.start_.yaw = self.odom_yaw_
+    def plan_to_ftr(self, params, intrinsics, path_to_ftr):
+        # set start pos as 0.8 second on the previous traj.
+        if self.last_plan_success_:
+            # Take previous traj
+            wp = self.prev_traj_.evaluate(0.8)
+            self.start_.pos = wp.pos
+            self.start_.yaw = wp.yaw
+        else:
+            self.start_.pos = self.odom_pos_
+            self.start_.yaw = self.odom_yaw_
 
-        self.goal_.pos = np.array([2, 2, 0])
-        self.goal_.yaw = 0
-
+        # call get_local_goal function to get local goal
+        goal_pos, goal_yaw = self.get_local_goal(self.start_.pos, path_to_ftr)
+        self.goal_.pos[:2] = goal_pos
+        self.goal_.pos[2] = self.odom_pos_[2]
+        self.goal_.yaw = goal_yaw
         self.plan_traj(self.start_, self.goal_, params, intrinsics)
+
+        # Compose goal msg
+        goal_msg = PoseStamped()
+        goal_msg.header.stamp = rospy.Time.now()
+        goal_msg.header.frame_id = "world"
+        goal_msg.pose.position.x = self.goal_.pos[0]
+        goal_msg.pose.position.y = self.goal_.pos[1]
+        goal_msg.pose.position.z = self.goal_.pos[2]    
+        quat = R.from_euler('z', goal_yaw).as_quat()
+        goal_msg.pose.orientation.x = quat[0]
+        goal_msg.pose.orientation.y = quat[1]
+        goal_msg.pose.orientation.z = quat[2]
+        goal_msg.pose.orientation.w = quat[3]
+        self.goal_pub_.publish(goal_msg)
+
+
+    def get_local_goal(self, s_pos, path, horizon=3):
+        # Path is a Nx2 array
+        # horizon is the distance to look ahead
+        # iterate through the path and find waypoints that are within the horizon
+        # return the last waypoint that is within the horizon
+        if path.shape[0] == 0:
+            return s_pos[:2], 0
+        elif path.shape[0] == 1:
+            return path[0], np.arctan2(path[0][1] - s_pos[1], path[0][0] - s_pos[0])
+        else:
+            for i in range(path.shape[0]):
+                dist = np.linalg.norm(s_pos[:2] - path[i])
+                if dist > horizon:
+                    return path[i-1], np.arctan2(path[i][1] - s_pos[1], path[i][0] - s_pos[0]) 
+            return path[-1], np.arctan2(path[-1][1] - s_pos[1], path[-1][0] - s_pos[0])
