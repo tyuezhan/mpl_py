@@ -350,10 +350,10 @@ class LocalPlanner:
 
 
     def plan_to_ftr(self, params, intrinsics, path_to_ftr):
-        # set start pos as 0.8 second on the previous traj.
+        # set start pos as 1.0 second on the previous traj.
         if self.last_plan_success_:
             # Take previous traj
-            wp = self.prev_traj_.evaluate(0.8)
+            wp = self.prev_traj_.evaluate(1.0)
             self.start_.pos = wp.pos
             self.start_.yaw = wp.yaw
         else:
