@@ -67,20 +67,20 @@ class Trajectory:
         for id, seg in enumerate(self.segs):
             if (tau >= self.taus[id] and tau < self.taus[id + 1]) or id == len(self.segs) - 1:
                 tau -= self.taus[id]
-                if seg.control() == 1:  # Assuming Control.CAR = 1
-                    return seg.evaluate(tau)
-                p = Waypoint(seg.control())
-                for j in range(len(p.pos)):
-                    pr = seg.pr(j)
-                    p.pos[j] = pr.p(tau)
-                    p.vel[j] = pr.v(tau)
-                    p.acc[j] = pr.a(tau)
-                    p.jrk[j] = pr.j(tau)
-                p.yaw = np.arctan2(np.sin(seg.pr(0).p(tau)), np.cos(seg.pr(0).p(tau)))
-                return p
+                # if seg.control == 1:  # Assuming Control.CAR = 1
+                return seg.evaluate(tau)
+                # p = Waypoint(seg.control())
+                # for j in range(len(p.pos)):
+                #     pr = seg.pr(j)
+                #     p.pos[j] = pr.p(tau)
+                #     p.vel[j] = pr.v(tau)
+                #     p.acc[j] = pr.a(tau)
+                #     p.jrk[j] = pr.j(tau)
+                # p.yaw = np.arctan2(np.sin(seg.pr(0).p(tau)), np.cos(seg.pr(0).p(tau)))
+                # return p
         
         print(f"Cannot find tau according to time: {time}")
-        return Waypoint(0)
+        return None
     
     def evaluate_command(self, time: float, p: Command) -> bool:
         tau = self.lambda_.getTau(time)

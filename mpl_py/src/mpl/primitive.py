@@ -117,6 +117,9 @@ class Primitive:
         p_curr = self.p(t)
         wp.pos = p_curr[:3]
         wp.yaw = p_curr[3]
+        vt = self.v(t)
+        wp.vel = vt[:3]
+        wp.yaw_dot = vt[3]
         return wp
 
 
