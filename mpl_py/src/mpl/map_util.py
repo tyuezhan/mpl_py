@@ -90,7 +90,14 @@ class MapUtil:
         return: [num_points, num_gaussians, 2] where the first column is the distance to each gaussian
         and the second column is whether the distance is smaller than the 3*radius+agent radius
         '''
-        self.gaussians['radius'] = self.gaussians['radius'].squeeze()
+        # Mask out min_height
+        # take first point height
+        min_z = points[0, 2] + 0.1
+        z_mask = self.gaussians['means3D'][:, 2] > min_z
+        gaussians = self.gaussians['means3D'][z_mask]
+        radii = self.gaussians['radius'][z_mask]
+
+        radii = radii.squeeze()
         # print("shape of points: ", points.shape)
         # print("shape of gaussians: ", self.gaussians['means3D'].shape)
         # print("shape of radius: ", self.gaussians['radius'].shape)
@@ -99,15 +106,15 @@ class MapUtil:
             points = torch.tensor(points).to(self.gaussians['means3D'].device)
 
         num_points = points.shape[0]
-        num_gaussians = self.gaussians['means3D'].shape[0]
+        num_gaussians = gaussians.shape[0]
         
         # Initialize the output array
         results = torch.zeros(num_points, num_gaussians, 2)
         
         # Vectorized implementation
         points = points.unsqueeze(1).repeat(1, num_gaussians, 1)
-        gaussians = self.gaussians['means3D'].unsqueeze(0).repeat(num_points, 1, 1)
-        radii = self.gaussians['radius'].unsqueeze(0).repeat(num_points, 1)
+        gaussians = gaussians.unsqueeze(0).repeat(num_points, 1, 1)
+        radii = radii.unsqueeze(0).repeat(num_points, 1)
         
         # Compute distances
         dists = torch.norm(points - gaussians, dim=-1)
@@ -135,8 +142,18 @@ class MapUtil:
         
         return: [M, N, num_gaussians, 2] or [N, num_gaussians, 2] if input is [N, 3]
         '''
+        # Mask out min_height
+        # take first point height
+        if points.dim() == 2:
+            min_z = points[0, 2] + 0.1
+        else:
+            min_z = points[0, 0, 2] + 0.1
+        z_mask = self.gaussians['means3D'][:, 2] > min_z
+        gaussians = self.gaussians['means3D'][z_mask]
+        radii = self.gaussians['radius'][z_mask]
+
         # Ensure radius is squeezed to correct shape
-        self.gaussians['radius'] = self.gaussians['radius'].squeeze()
+        radii = radii.squeeze()
         
         # Ensure points is a tensor and move it to the correct device
         if not torch.is_tensor(points):
@@ -147,15 +164,15 @@ class MapUtil:
             points = points.unsqueeze(0)  # Convert [N, 3] to [1, N, 3]
 
         M, N, _ = points.shape
-        num_gaussians = self.gaussians['means3D'].shape[0]
+        num_gaussians = gaussians.shape[0]
         
         # Initialize the output array
         results = torch.zeros(M, N, num_gaussians, 2, device=points.device)
         
         # Vectorized implementation
         points = points.unsqueeze(2).repeat(1, 1, num_gaussians, 1)  # Shape: [M, N, num_gaussians, 3]
-        gaussians = self.gaussians['means3D'].unsqueeze(0).unsqueeze(0).repeat(M, N, 1, 1)  # Shape: [M, N, num_gaussians, 3]
-        radii = self.gaussians['radius'].unsqueeze(0).unsqueeze(0).repeat(M, N, 1)  # Shape: [M, N, num_gaussians]
+        gaussians = gaussians.unsqueeze(0).unsqueeze(0).repeat(M, N, 1, 1)  # Shape: [M, N, num_gaussians, 3]
+        radii = radii.unsqueeze(0).unsqueeze(0).repeat(M, N, 1)  # Shape: [M, N, num_gaussians]
         
         # Compute distances
         dists = torch.norm(points - gaussians, dim=-1)  # Shape: [M, N, num_gaussians]
