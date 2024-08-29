@@ -99,7 +99,7 @@ class LocalPlanner:
             try:
                 # Lookup the static transform
                 source_frame = 'world'
-                target_frame = 'map'
+                target_frame = 'gs_map'
                 transform = self.tf_buffer.lookup_transform(source_frame, target_frame, rospy.Time(0))
                 # Print out the transform details
                 rospy.loginfo(f"Transform from {source_frame} to {target_frame}:")
@@ -265,7 +265,7 @@ class LocalPlanner:
         # lookup the TF between map frame and the world frame
         try:
             # Lookup the static transform
-            source_frame = 'map'
+            source_frame = 'gs_map'
             target_frame = 'world'
             transform = self.tf_buffer.lookup_transform(source_frame, target_frame, rospy.Time(0))
             # Print out the transform details

@@ -268,7 +268,7 @@ class Planner:
                     if self.debug:
                         # compose the marker array
                         marker = Marker()
-                        marker.header.frame_id = "map"
+                        marker.header.frame_id = "gs_map"
                         marker.header.stamp = rospy.Time.now()
                         marker.ns = "waypoints"
                         marker.id = i*len(prs) + j
