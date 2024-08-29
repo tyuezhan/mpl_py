@@ -43,9 +43,9 @@ class LocalPlanner:
         self.a_max = 0.5
         self.yaw_max = 0.314
         self.dt = 1.0
-        self.goal_tolerance_ = 0.5
+        self.goal_tolerance_ = 0.8
         self.yaw_tolerance_ = 0.8
-        self.robot_radius_ = 0.1
+        self.robot_radius_ = 0.3
         self.num = 1
         self.map_set_ = False
         self.odom_init_ = False
@@ -207,7 +207,18 @@ class LocalPlanner:
             prs_msg.header.frame_id = "world"
             self.prs_pub_.publish(prs_msg)
             self.last_plan_success_ = False
-
+            if self.prev_traj_ is not None:
+                # reverse
+                goal = JackalMPTrackerGoal()
+                goal.header.stamp = rospy.Time.now()
+                goal.header.frame_id = "world"
+                traj_msg = to_trajectory_ros_msg(self.prev_traj_)
+                goal.trajectory = traj_msg
+                goal.reverse = True
+                self.tracker_client.send_goal(goal)
+                rospy.loginfo("Reverse previous traj. Send goal to tracker!")
+                self.prev_traj_ = None
+                
         else:
             rospy.loginfo("Succeed! Takes {} sec for planning, expand {} nodes".format(
                             (rospy.Time.now() - t0).to_sec(),
@@ -354,8 +365,13 @@ class LocalPlanner:
         if self.last_plan_success_:
             # Take previous traj
             wp = self.prev_traj_.evaluate(1.0)
-            self.start_.pos = wp.pos
-            self.start_.yaw = wp.yaw
+            # if goal is not far from current odom, use it
+            if np.linalg.norm(wp.pos[:2] - self.odom_pos_[:2]) < 0.6:
+                self.start_.pos = wp.pos
+                self.start_.yaw = wp.yaw
+            else:
+                self.start_.pos = self.odom_pos_
+                self.start_.yaw = self.odom_yaw_
         else:
             self.start_.pos = self.odom_pos_
             self.start_.yaw = self.odom_yaw_
