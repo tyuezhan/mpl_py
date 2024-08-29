@@ -115,7 +115,7 @@ class GraphSearch:
         ENV.set_plan_start_time()
 
         if ENV.is_goal(start_coord):
-            return 0, []
+            return [0], [[]]
 
         if start_coord not in ss.hm_:
             curr_node = State(start_coord)
@@ -150,15 +150,17 @@ class GraphSearch:
             curr_node = ss.pq_.popitem()[0]
             curr_node.iterationclosed = True
 
-            dist_to_goal = ENV.dist_to_goal(curr_node.coord)
-            if dist_to_goal < best_dist:
-                best_dist = dist_to_goal
-                best_node = curr_node
-                best_node_list.append(curr_node)
-                best_counter += 1
-                if best_counter > best_k:
-                    best_node_list.popleft()
-                    best_counter -= 1
+            # Ignore the start node
+            if curr_node.coord != start_coord:
+                dist_to_goal = ENV.dist_to_goal(curr_node.coord)
+                if dist_to_goal < best_dist:
+                    best_dist = dist_to_goal
+                    best_node = curr_node
+                    best_node_list.append(curr_node)
+                    best_counter += 1
+                    if best_counter > best_k:
+                        best_node_list.popleft()
+                        best_counter -= 1
 
             succ_coord, succ_cost, succ_act_id = [], [], []
             # ENV.get_succ(curr_node.coord, succ_coord, succ_cost, succ_act_id)

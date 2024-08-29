@@ -325,6 +325,9 @@ class Planner:
             traj_cost_lst, prs_lst = planner_ptr.Astar_best_k(start, self.ENV, self.ss_ptr, self.traj, self.max_num)
             # First, transform all waypoints to the map frame
             s_time = rospy.Time.now()
+            print("trajectory cost list: ", traj_cost_lst)
+            if len(traj_cost_lst) == 1 and traj_cost_lst[0] == 0:
+                return False
             wps, costs, trajs = self.traj_to_wps_in_map(traj_cost_lst, prs_lst)
             if len(wps) == 0:
                 return False
