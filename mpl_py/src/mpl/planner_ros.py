@@ -79,7 +79,7 @@ class LocalPlanner:
         self.planner.setYawmax(self.yaw_max)
         self.planner.setTol(self.goal_tolerance_, -1, -1)
         self.planner.setTolYaw(self.yaw_tolerance_)
-        self.planner.setPlanTmax(1.0)
+        self.planner.setPlanTmax(0.3)
 
         self.odom_topic = rospy.get_param("~odom_topic", "/ground_truth/husky/odom")
         self.cloud_pub_ = rospy.Publisher("mpl/cloud", PointCloud, queue_size=1)
@@ -146,7 +146,15 @@ class LocalPlanner:
         self.map["radius"] = torch.exp(radius_log)
         self.map_set_ = True
         self.map_util.set_gaussians(self.map)
+        # means_clone = torch.clone(means).to(means.device)
+        # means_clone = torch.cat([means_clone, torch.ones(means_clone.shape[0], 1, device=means_clone.device)], dim=1)
+        # means_w = torch.matmul(self.map2world, means_clone.t()).t()[:, :3]
 
+        # radius_log_clone = torch.clone(radius_log).to(means.device)
+        # self.map["means3D"] = means_w
+        # self.map["radius"] = torch.exp(radius_log_clone)
+        # self.map_set_ = True
+        # self.map_util.set_gaussians(self.map)
         if self.debug:
             self.publish_map()
 
@@ -217,7 +225,7 @@ class LocalPlanner:
                 goal.reverse = True
                 self.tracker_client.send_goal(goal)
                 rospy.loginfo("Reverse previous traj. Send goal to tracker!")
-                self.prev_traj_ = None
+                # self.prev_traj_ = None
                 
         else:
             rospy.loginfo("Succeed! Takes {} sec for planning, expand {} nodes".format(
@@ -362,19 +370,21 @@ class LocalPlanner:
 
     def plan_to_ftr(self, params, intrinsics, path_to_ftr):
         # set start pos as 1.0 second on the previous traj.
-        if self.last_plan_success_:
-            # Take previous traj
-            wp = self.prev_traj_.evaluate(1.0)
-            # if goal is not far from current odom, use it
-            if np.linalg.norm(wp.pos[:2] - self.odom_pos_[:2]) < 0.6:
-                self.start_.pos = wp.pos
-                self.start_.yaw = wp.yaw
-            else:
-                self.start_.pos = self.odom_pos_
-                self.start_.yaw = self.odom_yaw_
-        else:
-            self.start_.pos = self.odom_pos_
-            self.start_.yaw = self.odom_yaw_
+        # if self.last_plan_success_:
+        #     # Take previous traj
+        #     wp = self.prev_traj_.evaluate(0.3)
+        #     # if goal is not far from current odom, use it
+        #     if np.linalg.norm(wp.pos[:2] - self.odom_pos_[:2]) < 0.6:
+        #         self.start_.pos = wp.pos
+        #         self.start_.yaw = wp.yaw
+        #     else:
+        #         self.start_.pos = self.odom_pos_
+        #         self.start_.yaw = self.odom_yaw_
+        # else:
+        #     self.start_.pos = self.odom_pos_
+        #     self.start_.yaw = self.odom_yaw_
+        self.start_.pos = self.odom_pos_
+        self.start_.yaw = self.odom_yaw_
 
         # call get_local_goal function to get local goal
         goal_pos, goal_yaw = self.get_local_goal(self.start_.pos, path_to_ftr)
@@ -398,11 +408,13 @@ class LocalPlanner:
         self.goal_pub_.publish(goal_msg)
 
 
-    def get_local_goal(self, s_pos, path, horizon=3):
+    def get_local_goal(self, s_pos, path, horizon=5):
         # Path is a Nx2 array
         # horizon is the distance to look ahead
-        # iterate through the path and find waypoints that are within the horizon
-        # return the last waypoint that is within the horizon
+        # iterate through the path and find waypoints that are outside the horizon
+        # return the first waypoint that is outside the horizon
+        print("path:", path)
+        print("s_pos:", s_pos) 
         if path.shape[0] == 0:
             return s_pos[:2], 0
         elif path.shape[0] == 1:
@@ -411,5 +423,10 @@ class LocalPlanner:
             for i in range(path.shape[0]):
                 dist = np.linalg.norm(s_pos[:2] - path[i])
                 if dist > horizon:
-                    return path[i-1], np.arctan2(path[i][1] - s_pos[1], path[i][0] - s_pos[0]) 
+                    return path[i], np.arctan2(path[i][1] - s_pos[1], path[i][0] - s_pos[0])
             return path[-1], np.arctan2(path[-1][1] - s_pos[1], path[-1][0] - s_pos[0])
+            # for i in range(path.shape[0]):
+            #     dist = np.linalg.norm(s_pos[:2] - path[i])
+            #     if dist > horizon:
+            #         return path[i-1], np.arctan2(path[i][1] - s_pos[1], path[i][0] - s_pos[0]) 
+            # return path[-1], np.arctan2(path[-1][1] - s_pos[1], path[-1][0] - s_pos[0])
