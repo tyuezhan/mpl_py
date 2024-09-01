@@ -206,9 +206,9 @@ class LocalPlanner:
                 rospy.logerr("Failed! Takes {} sec for planning".format((rospy.Time.now() - t0).to_sec()))
             # cancel goal
             # check if the tracker is active
-            if self.tracker_client.get_state() == 1:
-                self.tracker_client.cancel_goal()
-                rospy.loginfo("Cancel goal!")
+            # if self.tracker_client.get_state() == 1:
+            #     self.tracker_client.cancel_goal()
+            #     rospy.loginfo("Cancel goal!")
             # Publish empty trajectory
             prs_msg = PrimitiveArray()
             prs_msg.header.stamp = t0
@@ -225,7 +225,7 @@ class LocalPlanner:
                 goal.reverse = True
                 self.tracker_client.send_goal(goal)
                 rospy.loginfo("Reverse previous traj. Send goal to tracker!")
-                # self.prev_traj_ = None
+                self.prev_traj_ = None
                 
         else:
             rospy.loginfo("Succeed! Takes {} sec for planning, expand {} nodes".format(
