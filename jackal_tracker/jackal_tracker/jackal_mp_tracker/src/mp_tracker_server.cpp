@@ -180,6 +180,8 @@ void MPTrackerServer::trackerGoalCB() {
     return;
   }
 
+  // Set reverse
+  reverse_traj_ = goal->reverse;
   // Save new trajectory into traj_
   toTrajectory3D(goal->trajectory);
   traj_start_ = ros::Time::now();
@@ -199,9 +201,6 @@ void MPTrackerServer::trackerGoalCB() {
   current_traj_length_ = 0.0;
   linear_controller_->resetError();
   angular_controller_->resetError();
-
-  // Set reverse
-  reverse_traj_ = goal->reverse;
 }
 
 void MPTrackerServer::preemptCb_() {
@@ -235,11 +234,7 @@ void MPTrackerServer::toTrajectory3D(const planning_ros_msgs::Trajectory& traj_m
   // If not reverse:
   if (!reverse_traj_) {
     for (const auto& it : traj_msg.primitives) {
-      // ROS_INFO("primitive type: %d", it.control_car);
-      // auto seg = toPrimitive3D(it);
-      // Vec2f U = seg.pr_car().coeff();
-      // ROS_ERROR("seg_control: %f, %f", U(0), U(1));
-      // Waypoint3D seg_end = seg.evaluate(1.0);
+      ROS_INFO("primitive type: %d", it.control_car);
       traj_->segs.push_back(toPrimitive3D(it));
       traj_->taus.push_back(traj_->taus.back() + it.t);
     }
@@ -376,8 +371,6 @@ void MPTrackerServer::update() {
   }
 
   double traj_time = (t_now - traj_start_).toSec();
-  ROS_INFO("Traj time: %f. Total time: %f", traj_time, traj_total_time_);
-
   if (traj_time >= traj_total_time_)  // Reached goal
   {
     ROS_WARN("[MPTrackerServer] Trajectory finished.");
@@ -447,8 +440,10 @@ void MPTrackerServer::update() {
     if (reverse_traj_) {
       // 1. the original traj_vel needs to be flipped (we go reverse direction)
       // 2. position error sign needs to be flipped
-      cmd_vel.linear.x = -traj_vel + linear_controller_->compute(error_pos, (t_now - t_prev_).toSec(), -pos_error_sign);
-      cmd_vel.angular.z = -yaw_vel + angular_controller_->compute(error_yaw, (t_now - t_prev_).toSec(), -1);
+      cmd_vel.linear.x = -traj_vel;
+      cmd_vel.angular.z = -yaw_vel;
+      // cmd_vel.linear.x = -traj_vel + linear_controller_->compute(error_pos, (t_now - t_prev_).toSec(), -pos_error_sign);
+      // cmd_vel.angular.z = -yaw_vel + angular_controller_->compute(error_yaw, (t_now - t_prev_).toSec(), -1);
     } else {
       cmd_vel.linear.x = traj_vel + linear_controller_->compute(error_pos, (t_now - t_prev_).toSec(), pos_error_sign);
       cmd_vel.angular.z = yaw_vel + angular_controller_->compute(error_yaw, (t_now - t_prev_).toSec(), 1);
