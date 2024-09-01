@@ -39,14 +39,16 @@ class LocalPlanner:
         self.x_max = 10
         self.y_min = -1
         self.y_max = 10
-        self.v_max = 0.5
-        self.a_max = 0.5
-        self.yaw_max = 0.314
-        self.dt = 1.0
-        self.goal_tolerance_ = 0.8
-        self.yaw_tolerance_ = 0.8
-        self.robot_radius_ = 0.3
-        self.num = 1
+        self.v_max = rospy.get_param("~v_max", 0.5)
+        self.a_max = rospy.get_param("~a_max", 0.5)
+        self.yaw_max = rospy.get_param("~yaw_max", np.pi/10)
+        self.dt = rospy.get_param("~dt", 1.0)
+        self.goal_tolerance_ = rospy.get_param("~goal_tolerance", 0.8)
+        self.yaw_tolerance_ = rospy.get_param("~yaw_tolerance", 1.0)
+        self.robot_size = rospy.get_param("~robot_size", 0.6)
+        self.robot_radius_ = self.robot_size / 2.0
+        self.num = rospy.get_param("~num_discretization", 5)
+        self.plan_max_time = rospy.get_param("~plan_t_max", 0.3)
         self.map_set_ = False
         self.odom_init_ = False
         self.debug = False
@@ -79,7 +81,7 @@ class LocalPlanner:
         self.planner.setYawmax(self.yaw_max)
         self.planner.setTol(self.goal_tolerance_, -1, -1)
         self.planner.setTolYaw(self.yaw_tolerance_)
-        self.planner.setPlanTmax(0.3)
+        self.planner.setPlanTmax(self.plan_max_time)
 
         self.odom_topic = rospy.get_param("~odom_topic", "/ground_truth/husky/odom")
         self.cloud_pub_ = rospy.Publisher("mpl/cloud", PointCloud, queue_size=1)
@@ -94,6 +96,20 @@ class LocalPlanner:
         # Tracker client
         self.tracker_client = SimpleActionClient('/jackal_tracker/mp_tracker_server', JackalMPTrackerAction)
         self.tracker_client.wait_for_server(rospy.Duration(2.0))
+
+        # Print params from config
+        rospy.loginfo(f"v_max: {self.v_max}")
+        rospy.loginfo(f"a_max: {self.a_max}")
+        rospy.loginfo(f"yaw_max: {self.yaw_max}")
+        rospy.loginfo(f"dt: {self.dt}")
+        rospy.loginfo(f"goal_tolerance: {self.goal_tolerance_}")
+        rospy.loginfo(f"yaw_tolerance: {self.yaw_tolerance_}")
+        rospy.loginfo(f"robot_radius: {self.robot_radius_}")
+        rospy.loginfo(f"num_discretization: {self.num}")
+        rospy.loginfo(f"plan_t_max: {self.plan_max_time}")
+        rospy.loginfo(f"odom_topic: {self.odom_topic}")
+
+        rospy.loginfo("Local planner initialized!")
 
 
     def set_map(self, means, radius_log):
