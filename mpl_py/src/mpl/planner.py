@@ -306,7 +306,7 @@ class Planner:
             self.ENV.info()
         
         if not self.ENV.is_free(start.pos):
-            print("[PlannerBase] start is not free!")
+            print("\033[1;31;40m [PlannerBase] start is not free!")
             return False
         
         planner_ptr = GraphSearch(self.planner_verbose)

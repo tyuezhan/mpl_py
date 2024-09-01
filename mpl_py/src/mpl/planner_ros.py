@@ -49,6 +49,7 @@ class LocalPlanner:
         self.robot_radius_ = self.robot_size / 2.0
         self.num = rospy.get_param("~num_discretization", 5)
         self.plan_max_time = rospy.get_param("~plan_t_max", 0.3)
+        self.collision_tol = rospy.get_param("~collision_tol", 3)
         self.map_set_ = False
         self.odom_init_ = False
         self.debug = False
@@ -71,7 +72,7 @@ class LocalPlanner:
         self.planner = Planner(eval_traj_func)
         self.primitive_dict = PrimitiveDict(5, self.U)
         self.primitive_dict.precompute()
-        self.map_util = MapUtil(self.x_min, self.x_max, self.y_min, self.y_max, self.robot_radius_)
+        self.map_util = MapUtil(self.x_min, self.x_max, self.y_min, self.y_max, self.robot_radius_, self.collision_tol)
         self.planner.setMapUtil(self.map_util, self.primitive_dict)
         self.planner.setU(self.U)
         self.planner.setDt(self.dt)
@@ -104,6 +105,7 @@ class LocalPlanner:
         rospy.loginfo(f"dt: {self.dt}")
         rospy.loginfo(f"goal_tolerance: {self.goal_tolerance_}")
         rospy.loginfo(f"yaw_tolerance: {self.yaw_tolerance_}")
+        rospy.loginfo(f"collision_tol: {self.collision_tol}")
         rospy.loginfo(f"robot_radius: {self.robot_radius_}")
         rospy.loginfo(f"num_discretization: {self.num}")
         rospy.loginfo(f"plan_t_max: {self.plan_max_time}")
