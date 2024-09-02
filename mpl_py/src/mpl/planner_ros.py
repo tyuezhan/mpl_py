@@ -50,6 +50,13 @@ class LocalPlanner:
         self.num = rospy.get_param("~num_discretization", 5)
         self.plan_max_time = rospy.get_param("~plan_t_max", 0.3)
         self.collision_tol = rospy.get_param("~collision_tol", 3)
+        self.sim_ = rospy.get_param("~use_sim", False)
+        if self.sim_:  # for sim
+            self.odom_frame_id = rospy.get_param("~odom_frame_id", "odom")
+            self.world_frame_id = rospy.get_param("~world_frame_id", "world")
+        else:
+            self.odom_frame_id = rospy.get_param("~robot_odom_frame_id", "odom")
+            self.world_frame_id = rospy.get_param("~robot_world_frame_id", "world")
         self.map_set_ = False
         self.odom_init_ = False
         self.debug = False
@@ -90,7 +97,7 @@ class LocalPlanner:
         self.prs_pub_ = rospy.Publisher("mpl/primitives", PrimitiveArray, queue_size=1)
         self.map_pub_ = rospy.Publisher("mpl/map", PointCloud2, queue_size=1)
         self.plan_sub_ = rospy.Subscriber("/move_base_simple/goal", PoseStamped, self.plan_cb, queue_size=1)
-        self.odom_sub_ = rospy.Subscriber(self.odom_topic, Odometry, self.odom_cb, queue_size=1)
+        # self.odom_sub_ = rospy.Subscriber(self.odom_topic, Odometry, self.odom_cb, queue_size=1)
         self.goal_pub_ = rospy.Publisher("mpl/goal", PoseStamped, queue_size=1)
         # TF
         self.tf_buffer = tf2_ros.Buffer()
@@ -204,9 +211,37 @@ class LocalPlanner:
 
 
     def plan_traj(self, start, goal, params, intrinsics):
-        if not self.odom_init_:
-            rospy.logwarn("No odometry!")
+        # Lookup transform
+        try:
+            # Lookup the static transform
+            source_frame = self.world_frame_id
+            target_frame = self.odom_frame_id
+            transform = self.tf_buffer.lookup_transform(source_frame, target_frame, rospy.Time(0))
+            # Print out the transform details
+            rospy.loginfo(f"Transform from {source_frame} to {target_frame}:")
+            rospy.loginfo(f"Translation: {transform.transform.translation.x}, {transform.transform.translation.y}, {transform.transform.translation.z}")
+            rospy.loginfo(f"Rotation: {transform.transform.rotation.x}, {transform.transform.rotation.y}, {transform.transform.rotation.z}, {transform.transform.rotation.w}")
+        except tf2_ros.LookupException as e:
+            rospy.logerr(f"Transform lookup failed: {e}")
             return
+        except tf2_ros.ConnectivityException as e:
+            rospy.logerr(f"Transform connectivity issue: {e}")
+            return
+        except tf2_ros.ExtrapolationException as e:
+            rospy.logerr(f"Transform extrapolation issue: {e}")
+            return
+        self.odom_pos_ = np.array([transform.transform.translation.x, transform.transform.translation.y, transform.transform.translation.z])
+        self.odom_yaw_ = R.from_quat([
+            transform.transform.rotation.x,
+            transform.transform.rotation.y,
+            transform.transform.rotation.z,
+            transform.transform.rotation.w
+        ]).as_euler("xyz")[2]
+        rospy.loginfo(f"Odom pos: {self.odom_pos_}, Odom yaw: {self.odom_yaw_}")
+
+        # if not self.odom_init_:
+        #     rospy.logwarn("No odometry!")
+        #     return
         if not self.map_set_:
             rospy.logwarn("No map!")
             return
