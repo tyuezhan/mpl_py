@@ -68,6 +68,11 @@ class MapUtil:
         return is_outside.any()
 
     def new_is_occupied(self, pts):
+        '''
+        Return 2D array of shape (M, 2)
+        First row is whether the traj has collision
+        Second row is the collision cost
+        '''
         # pts is Nx3 or MxNx3
         if not torch.is_tensor(pts):
             pts = torch.tensor(pts).to(self.gaussians['means3D'].device)
@@ -89,12 +94,24 @@ class MapUtil:
             # print("collision_filtered: ", collision_filtered)
             # reduce to M dimension by sum over N
             # print(torch.any(collision_filtered, dim=1))
-            return torch.any(collision_filtered, dim=1) # Checks across N dimension
+
+            # Collision cost
+            dist = ret[:, :, :, 0]
+            dist[dist > 3] = 0
+            dist = -dist + 3
+            dist_cost = torch.sum(dist, dim=(1,2))
+            return dist_cost, torch.any(collision_filtered, dim=1) # Checks across N dimension
         else:
             all_collisions = torch.sum(ret[:, :, 1], dim=1)
             collision_filtered = all_collisions > self.collision_tol
             # print("else:" , torch.any(collision_filtered, dim=1))
-            return torch.any(collision_filtered, dim=1)  # Checks across N dimension
+            # collision cost
+            dist = ret[:, :, 0]
+            dist[dist > 3] = 0
+            dist = -dist + 3
+            dist_cost = torch.sum(dist[:, :, 0], dim=1)
+            return dist_cost, torch.any(collision_filtered, dim=1)
+            # return torch.any(collision_filtered, dim=1)  # Checks across N dimension
             # return torch.sum(ret[:, 1]) > self.collision_tol
 
     def collision_testing(self, points, use_point_radius=True):
@@ -109,7 +126,7 @@ class MapUtil:
         '''
         # Mask out min_height
         # take first point height
-        min_z = points[0, 2] + 0.3
+        min_z = points[0, 2] + 0.5
         z_mask = self.gaussians['means3D'][:, 2] > min_z
         gaussians = self.gaussians['means3D'][z_mask]
         if use_point_radius:
@@ -167,9 +184,9 @@ class MapUtil:
         # Mask out min_height
         # take first point height
         if points.dim() == 2:
-            min_z = points[0, 2] + 0.3
+            min_z = points[0, 2] + 0.5
         else:
-            min_z = points[0, 0, 2] + 0.3
+            min_z = points[0, 0, 2] + 0.5
         z_mask = self.gaussians['means3D'][:, 2] > min_z
         gaussians = self.gaussians['means3D'][z_mask]
         if use_point_radius:

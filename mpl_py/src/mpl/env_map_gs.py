@@ -71,7 +71,7 @@ class EnvMap(EnvBase):
 
     def vec_traverse_primitive(self, primitives):
         n = 3
-        c = np.zeros(len(primitives))
+        # c = np.zeros(len(primitives))
         pts_pos = np.zeros((len(primitives), n, 3))
         for i, primitive in enumerate(primitives):
             for j, t in enumerate(np.linspace(0, primitive.t, n)):
@@ -85,8 +85,9 @@ class EnvMap(EnvBase):
         # For experiments, can add it back if needed. 
         # if self.map_util.is_outside(pts_pos):
             # return float('inf')
-        all_collisions = self.map_util.new_is_occupied(pts_pos)
+        collision_costs, all_collisions = self.map_util.new_is_occupied(pts_pos)
         all_collisions = all_collisions.detach().cpu().numpy()
+        c = collision_costs.detach().cpu().numpy()
         c[all_collisions] = float('inf')
         return c
 
