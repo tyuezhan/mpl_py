@@ -115,7 +115,7 @@ class LocalPlanner:
         rospy.loginfo("Local planner initialized!")
 
 
-    def set_map(self, means, radius_log):
+    def set_map(self, means, radius_log, ground_labels):
         if self.map2world is None:
             # It should contain at least means3D and radius
             # lookup the TF between map frame and the world frame
@@ -163,6 +163,7 @@ class LocalPlanner:
 
         self.map["means3D"] = means_w
         self.map["radius"] = torch.exp(radius_log)
+        self.map["ground_labels"] = ground_labels
         self.map_set_ = True
         self.map_util.set_gaussians(self.map)
         # means_clone = torch.clone(means).to(means.device)

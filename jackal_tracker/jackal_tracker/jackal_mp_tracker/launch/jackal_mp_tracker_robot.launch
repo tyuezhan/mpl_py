@@ -3,7 +3,7 @@
   <node pkg="jackal_mp_tracker" name="mp_tracker_server_node" type="mp_tracker_server_node" output="$(arg output)" >
     <rosparam command="load" file="$(find active_3dgs)/config/local_planner.yaml" />
         <remap from="/tracker/cmd_vel" to="/twist_auto"/>
-        <remap from="/odometry/filtered" to="/ground_truth/husky/odom_throttled"/>
+        <remap from="/odometry/filtered" to="/Odometry"/>
   </node>
 
 </launch>
