@@ -66,6 +66,7 @@ class LocalPlanner:
         self.prev_traj_ = None
         self.last_plan_success_ = False
         self.reversing_ = False
+        self.horizon = rospy.get_param("~planning_horizon", 3)
 
         # Compute U
         # du = 0.8 * self.v_max / (2*self.num)
@@ -118,6 +119,7 @@ class LocalPlanner:
         rospy.loginfo(f"num_discretization: {self.num}")
         rospy.loginfo(f"plan_t_max: {self.plan_max_time}")
         rospy.loginfo(f"odom_topic: {self.odom_topic}")
+        rospy.loginfo(f"planning_horizon: {self.horizon}")
 
         rospy.loginfo("Local planner initialized!")
 
@@ -444,7 +446,7 @@ class LocalPlanner:
         self.start_.yaw = self.odom_yaw_
 
         # call get_local_goal function to get local goal
-        goal_pos, goal_yaw = self.get_local_goal(self.start_.pos, path_to_ftr)
+        goal_pos, goal_yaw = self.get_local_goal(self.start_.pos, path_to_ftr, horizon=self.horizon)
         self.goal_.pos[:2] = goal_pos
         self.goal_.pos[2] = self.odom_pos_[2]
         self.goal_.yaw = goal_yaw
@@ -465,7 +467,7 @@ class LocalPlanner:
         self.goal_pub_.publish(goal_msg)
 
 
-    def get_local_goal(self, s_pos, path, horizon=5):
+    def get_local_goal(self, s_pos, path, horizon=3):
         # Path is a Nx2 array
         # horizon is the distance to look ahead
         # iterate through the path and find waypoints that are outside the horizon
@@ -477,8 +479,9 @@ class LocalPlanner:
         elif path.shape[0] == 1:
             return path[0], np.arctan2(path[0][1] - s_pos[1], path[0][0] - s_pos[0])
         else:
+            dist = 0
             for i in range(path.shape[0]):
-                dist = np.linalg.norm(s_pos[:2] - path[i])
+                dist += np.linalg.norm(s_pos[:2] - path[i])
                 if dist > horizon:
                     return path[i], np.arctan2(path[i][1] - s_pos[1], path[i][0] - s_pos[0])
             return path[-1], np.arctan2(path[-1][1] - s_pos[1], path[-1][0] - s_pos[0])
