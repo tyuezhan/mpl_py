@@ -50,7 +50,7 @@ class LocalPlanner:
         self.num = rospy.get_param("~num_discretization", 5)
         self.plan_max_time = rospy.get_param("~plan_t_max", 0.3)
         self.collision_tol = rospy.get_param("~collision_tol", 3)
-        self.sim_ = rospy.get_param("~use_sim", False)
+        self.sim_ = rospy.get_param("~gs_sim", False)
         if self.sim_:  # for sim
             self.odom_frame_id = rospy.get_param("~odom_frame_id", "odom")
             self.world_frame_id = rospy.get_param("~world_frame_id", "world")
