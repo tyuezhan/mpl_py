@@ -116,7 +116,7 @@ class EnvBase:
         p0 = []
         p0.append(curr.pos[0])
         p0.append(curr.pos[1])
-        p0.append(curr.vel[0])
+        p0.append(curr.pos[2])
         p0.append(curr.yaw)
         pr = Primitive(p0, self.U[action_id], self.dt)
         return pr
