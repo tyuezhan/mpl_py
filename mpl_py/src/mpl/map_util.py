@@ -126,14 +126,11 @@ class MapUtil:
         '''
         # Mask out min_height
         # take first point height
-        min_z = points[0, 2] + 0.5
+        # min_z = points[0, 2] + 0.5
         # z_mask = self.gaussians['means3D'][:, 2] > min_z
-        z_mask = (self.gaussians['ground_labels'] == 0) # keep points that are not ground
-        print('Num gaussians before mask: ', self.gaussians['means3D'].shape[0])
-        gaussians = self.gaussians['means3D'][z_mask]
-        print('Num gaussians after mask: ', gaussians.shape[0])
+        gaussians = self.gaussians['means3D']
         if use_point_radius:
-            radii = self.gaussians['radius'][z_mask]
+            radii = self.gaussians['radius']
 
             radii = radii.squeeze()
         # print("shape of points: ", points.shape)
@@ -184,14 +181,14 @@ class MapUtil:
         '''
         # Mask out min_height
         # take first point height
-        min_z = points[0, 2] + 0.5
-        # z_mask = self.gaussians['means3D'][:, 2] > min_z
-        z_mask = (self.gaussians['ground_labels'] == 0) # keep points that are not ground
-        print('Num gaussians before mask: ', self.gaussians['means3D'].shape[0])
-        gaussians = self.gaussians['means3D'][z_mask]
-        print('Num gaussians after mask: ', gaussians.shape[0])
+        # min_z = points[0, 2] + 0.5
+        # # z_mask = self.gaussians['means3D'][:, 2] > min_z
+        # z_mask = (self.gaussians['ground_labels'] == 0) # keep points that are not ground
+        # print('Num gaussians before mask: ', self.gaussians['means3D'].shape[0])
+        gaussians = self.gaussians['means3D']
+        # print('Num gaussians after mask: ', gaussians.shape[0])
         if use_point_radius:
-            radii = self.gaussians['radius'][z_mask]
+            radii = self.gaussians['radius']
 
             radii = radii.squeeze()
         # print("shape of points: ", points.shape)

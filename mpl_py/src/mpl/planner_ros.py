@@ -172,9 +172,15 @@ class LocalPlanner:
         means = torch.cat([means, torch.ones(means.shape[0], 1, device=means.device)], dim=1)
         means_w = torch.matmul(self.map2world, means.t()).t()[:, :3]
 
+        z_mask = (ground_labels == 0) # keep points that are not ground
+        print('Num gaussians before mask: ', means_w.shape[0])
+        means_w = means_w[z_mask]
+        radius_log = radius_log[z_mask]
+        print('Num gaussians after mask: ', means_w[0])
+
         self.map["means3D"] = means_w
         self.map["radius"] = torch.exp(radius_log)
-        self.map["ground_labels"] = ground_labels
+        # self.map["ground_labels"] = ground_labels
         self.map_set_ = True
         self.map_util.set_gaussians(self.map)
         # means_clone = torch.clone(means).to(means.device)
