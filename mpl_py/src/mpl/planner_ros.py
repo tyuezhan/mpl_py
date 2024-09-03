@@ -481,7 +481,10 @@ class LocalPlanner:
         else:
             dist = 0
             for i in range(path.shape[0]):
-                dist += np.linalg.norm(s_pos[:2] - path[i])
+                if i == 0:
+                    dist = np.linalg.norm(s_pos[:2] - path[i])
+                else:
+                    dist += np.linalg.norm(path[i-1] - path[i])
                 if dist > horizon:
                     return path[i], np.arctan2(path[i][1] - s_pos[1], path[i][0] - s_pos[0])
             return path[-1], np.arctan2(path[-1][1] - s_pos[1], path[-1][0] - s_pos[0])
