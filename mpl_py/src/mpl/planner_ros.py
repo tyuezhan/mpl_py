@@ -63,6 +63,7 @@ class LocalPlanner:
         self.map2world = None
         self.world2map = None
         self.pc_fields_ = self.make_fields()
+        self.debug_pc_fields_ = self.make_debug_fields()
         self.prev_traj_ = None
         self.last_plan_success_ = False
         self.reversing_ = False
@@ -97,6 +98,7 @@ class LocalPlanner:
         self.cloud_pub_ = rospy.Publisher("mpl/cloud", PointCloud, queue_size=1)
         self.prs_pub_ = rospy.Publisher("mpl/primitives", PrimitiveArray, queue_size=1)
         self.map_pub_ = rospy.Publisher("mpl/map", PointCloud2, queue_size=1)
+        self.collision_pub_ = rospy.Publisher("mpl/collision", PointCloud2, queue_size=1)
         self.plan_sub_ = rospy.Subscriber("/move_base_simple/goal", PoseStamped, self.plan_cb, queue_size=1)
         # self.odom_sub_ = rospy.Subscriber(self.odom_topic, Odometry, self.odom_cb, queue_size=1)
         self.goal_pub_ = rospy.Publisher("mpl/goal", PoseStamped, queue_size=1)
@@ -255,6 +257,7 @@ class LocalPlanner:
 
         t0 = rospy.Time.now()
         valid = self.planner.plan(start, goal, params, intrinsics)
+        self.publish_collision_pts(start.pos)
         if not valid:
             if self.planner.initialized():
                 rospy.logerr("Failed! Takes {} sec for planning, expand {} nodes".format((rospy.Time.now() - t0).to_sec(),
@@ -407,6 +410,44 @@ class LocalPlanner:
         fields.append(field)
         return fields
 
+    def make_debug_fields(self):
+        fields = []
+        field = PointField()
+        field.name = 'x'
+        field.count = 1
+        field.offset = 0
+        field.datatype = PointField.FLOAT32
+        fields.append(field)
+
+        field = PointField()
+        field.name = 'y'
+        field.count = 1
+        field.offset = 4
+        field.datatype = PointField.FLOAT32
+        fields.append(field)
+
+        field = PointField()
+        field.name = 'z'
+        field.count = 1
+        field.offset = 8
+        field.datatype = PointField.FLOAT32
+        fields.append(field)
+
+        field = PointField()
+        field.name = 'rgb'
+        field.count = 1
+        field.offset = 12
+        field.datatype = PointField.UINT32
+        fields.append(field)
+
+        field = PointField()
+        field.name = 'size'
+        field.count = 1
+        field.offset = 16
+        field.datatype = PointField.FLOAT32
+        fields.append(field)
+        return fields
+
     def publish_map(self):
         if not self.map_set_:
             rospy.logwarn("No map!")
@@ -493,3 +534,41 @@ class LocalPlanner:
             #     if dist > horizon:
             #         return path[i-1], np.arctan2(path[i][1] - s_pos[1], path[i][0] - s_pos[0]) 
             # return path[-1], np.arctan2(path[-1][1] - s_pos[1], path[-1][0] - s_pos[0])
+
+    def publish_collision_pts(self, pos):
+        s_time = rospy.Time.now()
+        # Publish the GS points as PointCloud2
+        pos = torch.tensor(pos).reshape(1, 3).to(self.map['means3D'].device)
+        # original_gs_points = original_gs_points[gs_ground_labels == 0]
+        # print("shape of latest_means3D: ", self.latest_means3D.shape)
+
+        # Check for collision 
+        ret, gaussians = self.map_util.collision_testing_debug(pos)
+        collision_pts = gaussians[ret[:, :, 1] == 1].detach().cpu().numpy()
+        # convert to ros point cloud
+        # color points as red
+        gs_colors = np.zeros((collision_pts.shape[0], 3))
+        gs_colors[:, 0] = 1
+        gs_sizes = np.ones(collision_pts.shape[0]) * 0.1
+        # create the point cloud    
+        # create the point cloud
+        rgb_data = np.array([
+                (int(r * 255) << 16) | (int(g * 255) << 8) | int(b * 255)
+                for b, g, r in gs_colors], dtype=np.uint32)                
+
+        point_data = [[None] *5] * len(collision_pts)
+        for i in range(len(collision_pts)):
+            point_data[i] = [collision_pts[i][0], collision_pts[i][1], collision_pts[i][2], int(rgb_data[i]), gs_sizes[i]]
+        # point_data = np.concatenate((gs_points, rgb_data[:, np.newaxis], gs_sizes), axis=1).tolist()
+        # change rgb_data in point_data to int
+        # for i in range(len(point_data)):
+        #     point_data[i][3] = int(point_data[i][3])
+
+        header = Header()
+        header.stamp = rospy.Time.now()
+        header.frame_id = "world"
+        # print(point_data[0])
+        cloud = point_cloud2.create_cloud(header, self.debug_pc_fields_, point_data)
+        self.collision_pub_.publish(cloud)
+        e_time = rospy.Time.now()
+        rospy.loginfo(f"Published Collision Map! Time: {(e_time-s_time).to_sec()} s")

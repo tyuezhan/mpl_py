@@ -172,6 +172,64 @@ class MapUtil:
         # print(results)
         return results
 
+    def collision_testing_debug(self, points, use_point_radius=True):
+        '''
+        This function computes each points distance to all the gaussians in gaussians['means3D']
+        and save the distance to each gaussian and whether it is smaller than the radius
+        points: [num_points, 3]
+        gaussians['means3D']: [num_gaussians, 3] centers of points
+        gaussians['radius']: [num_gaussians,1] the radius of the gaussians
+        return: [num_points, num_gaussians, 2] where the first column is the distance to each gaussian
+        and the second column is whether the distance is smaller than the 3*radius+agent radius
+        '''
+        # Mask out min_height
+        # take first point height
+        min_z = points[0, 2] + 0.5
+        # z_mask = self.gaussians['means3D'][:, 2] > min_z
+        z_mask = (self.gaussians['ground_labels'] == 0) # keep points that are not ground
+        print('Num gaussians before mask: ', self.gaussians['means3D'].shape[0])
+        gaussians = self.gaussians['means3D'][z_mask]
+        print('Num gaussians after mask: ', gaussians.shape[0])
+        if use_point_radius:
+            radii = self.gaussians['radius'][z_mask]
+
+            radii = radii.squeeze()
+        # print("shape of points: ", points.shape)
+        # print("shape of gaussians: ", self.gaussians['means3D'].shape)
+        # print("shape of radius: ", self.gaussians['radius'].shape)
+        # if poitns not tensor, convert to tensor
+        if not torch.is_tensor(points):
+            points = torch.tensor(points).to(self.gaussians['means3D'].device)
+
+        num_points = points.shape[0]
+        num_gaussians = gaussians.shape[0]
+        
+        # Initialize the output array
+        results = torch.zeros(num_points, num_gaussians, 2)
+        
+        # Vectorized implementation
+        points = points.unsqueeze(1).repeat(1, num_gaussians, 1)
+        gaussians = gaussians.unsqueeze(0).repeat(num_points, 1, 1)
+        if use_point_radius:
+            radii = radii.unsqueeze(0).repeat(num_points, 1)
+        
+        # Compute distances
+        dists = torch.norm(points - gaussians, dim=-1)
+        
+        # Check if distances are smaller than radii
+        if use_point_radius:
+            within_radius = dists < (radii*3 + self.agent_radius)
+        else:
+            within_radius = dists < (self.agent_radius)
+        
+        # Fill the results array
+        results[:, :, 0] = dists
+        results[:, :, 1] = within_radius.float()  # convert boolean to float for storage
+        
+        # print("return results shape: ", results.shape)
+        # print(results)
+        return results, gaussians
+
 
     def new_collision_testing(self, points, use_point_radius=True):
         '''
