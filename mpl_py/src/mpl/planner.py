@@ -307,7 +307,7 @@ class Planner:
         
         if not self.ENV.is_free(start.pos):
             print("\033[1;31;40m [PlannerBase] start is not free!")
-            return False
+            return -1
         
         planner_ptr = GraphSearch(self.planner_verbose)
         
@@ -325,12 +325,13 @@ class Planner:
             traj_cost_lst, prs_lst = planner_ptr.Astar_best_k(start, self.ENV, self.ss_ptr, self.traj, self.max_num)
             # First, transform all waypoints to the map frame
             s_time = rospy.Time.now()
-            print("trajectory cost list: ", traj_cost_lst)
+            # print("trajectory cost list: ", traj_cost_lst)
             if len(traj_cost_lst) == 1 and traj_cost_lst[0] == 0:
-                return False
+                rospy.loginfo("Reach goal!")
+                return 1
             wps, costs, trajs = self.traj_to_wps_in_map(traj_cost_lst, prs_lst)
             if len(wps) == 0:
-                return False
+                return 0
             # Call gaussian gradient cost here
             utils = self.eval_traj_func(wps, params, intrinsics)
             utils = [util.detach().cpu().numpy() for util in utils]
@@ -341,7 +342,7 @@ class Planner:
             self.traj_cost = costs[best_idx]
         if np.isinf(self.traj_cost):
             if self.planner_verbose:
-                print("[PlannerBase] Cannot find a trajectory!")
-            return False
+                rospy.loginfo("[PlannerBase] Cannot find a trajectory!")
+            return 0
         
-        return True
+        return 1

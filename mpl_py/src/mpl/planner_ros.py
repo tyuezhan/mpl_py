@@ -237,13 +237,13 @@ class LocalPlanner:
             rospy.loginfo(f"Rotation: {transform.transform.rotation.x}, {transform.transform.rotation.y}, {transform.transform.rotation.z}, {transform.transform.rotation.w}")
         except tf2_ros.LookupException as e:
             rospy.logerr(f"Transform lookup failed: {e}")
-            return
+            return -1
         except tf2_ros.ConnectivityException as e:
             rospy.logerr(f"Transform connectivity issue: {e}")
-            return
+            return -1
         except tf2_ros.ExtrapolationException as e:
             rospy.logerr(f"Transform extrapolation issue: {e}")
-            return
+            return -1
         self.odom_pos_ = np.array([transform.transform.translation.x, transform.transform.translation.y, transform.transform.translation.z])
         self.odom_yaw_ = R.from_quat([
             transform.transform.rotation.x,
@@ -258,31 +258,31 @@ class LocalPlanner:
         #     return
         if not self.map_set_:
             rospy.logwarn("No map!")
-            return
+            return -1
         if not self.find_world2map():
             rospy.logwarn("No world2map!")
-            return
+            return -1
         
         rospy.loginfo("Called plan traj!")
 
         t0 = rospy.Time.now()
-        valid = self.planner.plan(start, goal, params, intrinsics)
+        status = self.planner.plan(start, goal, params, intrinsics)
         
         # For debug collision points.
         if self.pub_collision_map_:
             self.publish_collision_pts(start.pos)
 
-        if not valid:
+        if status <= 0:
             if self.planner.initialized():
-                rospy.logerr("Failed! Takes {} sec for planning, expand {} nodes".format((rospy.Time.now() - t0).to_sec(),
+                rospy.logerr("[planner ros] Failed! Takes {} sec for planning, expand {} nodes".format((rospy.Time.now() - t0).to_sec(),
                                 len(self.planner.getCloseSet())))
             else:
-                rospy.logerr("Failed! Takes {} sec for planning".format((rospy.Time.now() - t0).to_sec()))
+                rospy.logerr("[planner ros] Failed! Takes {} sec for planning".format((rospy.Time.now() - t0).to_sec()))
             # cancel goal
             # check if the tracker is active
             if self.tracker_client.get_state() == 1 and self.reversing_ == False:
                 self.tracker_client.cancel_goal()
-                rospy.loginfo("Cancel goal!")
+                rospy.loginfo("[planner ros] Cancel goal!")
             # Publish empty trajectory
             prs_msg = PrimitiveArray()
             prs_msg.header.stamp = t0
@@ -298,12 +298,12 @@ class LocalPlanner:
                 goal.trajectory = traj_msg
                 goal.reverse = True
                 self.tracker_client.send_goal(goal)
-                rospy.loginfo("Reverse previous traj. Send goal to tracker!")
+                rospy.loginfo("[planner ros] Reverse previous traj. Send goal to tracker!")
                 self.prev_traj_ = None
                 self.reversing_ = True
                 
-        else:
-            rospy.loginfo("Succeed! Takes {} sec for planning, expand {} nodes".format(
+        elif status == 1:
+            rospy.loginfo("[planner ros] Succeed! Takes {} sec for planning, expand {} nodes".format(
                             (rospy.Time.now() - t0).to_sec(),
                             len(self.planner.getCloseSet())))
             if len(self.planner.getCloseSet()) == 0:
@@ -344,6 +344,9 @@ class LocalPlanner:
                 (traj.J('VEL'), traj.J('ACC'), traj.J('JRK'), traj.J('SNP'),
                 traj.get_total_time())
             )
+        else:
+            rospy.logerr("[planner ros] Unknown status!")
+            return -1
 
 
         # No matter succeed or not. Publish expanded nodes
@@ -354,7 +357,7 @@ class LocalPlanner:
         ps.header = header
         self.cloud_pub_.publish(ps)
 
-        if not valid:
+        if status <= 0:
             return -1
         else:
             return 0
