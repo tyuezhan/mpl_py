@@ -550,11 +550,12 @@ class LocalPlanner:
 
         # Check for collision 
         ret, gaussians = self.map_util.collision_testing_debug(pos)
+        gaussians = gaussians.squeeze(0)
         collision_pts = gaussians[ret[:, :, 1] == 1].detach().cpu().numpy()
         # convert to ros point cloud
         # color points as red
         gs_colors = np.zeros((collision_pts.shape[0], 3))
-        gs_colors[:, 0] = 1
+        gs_colors[:, 2] = 1
         gs_sizes = np.ones(collision_pts.shape[0]) * 0.1
         # create the point cloud    
         # create the point cloud
@@ -569,7 +570,6 @@ class LocalPlanner:
         # change rgb_data in point_data to int
         # for i in range(len(point_data)):
         #     point_data[i][3] = int(point_data[i][3])
-
         header = Header()
         header.stamp = rospy.Time.now()
         header.frame_id = "world"

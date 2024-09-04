@@ -35,7 +35,8 @@ class MapUtil:
         if pts.shape == (3, ):
             # make it a 1x3 array
             pts = pts.reshape(1, 3)
-        ret = self.collision_testing(pts)
+        # ret = self.collision_testing(pts)
+        ret = self.new_collision_testing(pts)
         # return torch.all(ret[:, :, 1] == 0)
         return torch.sum(ret[:, :, 1]) <= self.collision_tol
 
@@ -47,7 +48,8 @@ class MapUtil:
         if pts.shape == (3, ):
             # make it a 1x3 array
             pts = pts.reshape(1, 3)
-        ret = self.collision_testing(pts)
+        # ret = self.collision_testing(pts)
+        ret = self.new_collision_testing(pts)
         # return torch.any(ret[:, :, 1] > 0)
         return torch.sum(ret[:, :, 1]) > self.collision_tol
 
@@ -114,60 +116,60 @@ class MapUtil:
             # return torch.any(collision_filtered, dim=1)  # Checks across N dimension
             # return torch.sum(ret[:, 1]) > self.collision_tol
 
-    def collision_testing(self, points, use_point_radius=True):
-        '''
-        This function computes each points distance to all the gaussians in gaussians['means3D']
-        and save the distance to each gaussian and whether it is smaller than the radius
-        points: [num_points, 3]
-        gaussians['means3D']: [num_gaussians, 3] centers of points
-        gaussians['radius']: [num_gaussians,1] the radius of the gaussians
-        return: [num_points, num_gaussians, 2] where the first column is the distance to each gaussian
-        and the second column is whether the distance is smaller than the 3*radius+agent radius
-        '''
-        # Mask out min_height
-        # take first point height
-        # min_z = points[0, 2] + 0.5
-        # z_mask = self.gaussians['means3D'][:, 2] > min_z
-        gaussians = self.gaussians['means3D']
-        if use_point_radius:
-            radii = self.gaussians['radius']
+    # def collision_testing(self, points, use_point_radius=True):
+    #     '''
+    #     This function computes each points distance to all the gaussians in gaussians['means3D']
+    #     and save the distance to each gaussian and whether it is smaller than the radius
+    #     points: [num_points, 3]
+    #     gaussians['means3D']: [num_gaussians, 3] centers of points
+    #     gaussians['radius']: [num_gaussians,1] the radius of the gaussians
+    #     return: [num_points, num_gaussians, 2] where the first column is the distance to each gaussian
+    #     and the second column is whether the distance is smaller than the 3*radius+agent radius
+    #     '''
+    #     # Mask out min_height
+    #     # take first point height
+    #     # min_z = points[0, 2] + 0.5
+    #     # z_mask = self.gaussians['means3D'][:, 2] > min_z
+    #     gaussians = self.gaussians['means3D']
+    #     if use_point_radius:
+    #         radii = self.gaussians['radius']
 
-            radii = radii.squeeze()
-        # print("shape of points: ", points.shape)
-        # print("shape of gaussians: ", self.gaussians['means3D'].shape)
-        # print("shape of radius: ", self.gaussians['radius'].shape)
-        # if poitns not tensor, convert to tensor
-        if not torch.is_tensor(points):
-            points = torch.tensor(points).to(self.gaussians['means3D'].device)
+    #         radii = radii.squeeze()
+    #     # print("shape of points: ", points.shape)
+    #     # print("shape of gaussians: ", self.gaussians['means3D'].shape)
+    #     # print("shape of radius: ", self.gaussians['radius'].shape)
+    #     # if poitns not tensor, convert to tensor
+    #     if not torch.is_tensor(points):
+    #         points = torch.tensor(points).to(self.gaussians['means3D'].device)
 
-        num_points = points.shape[0]
-        num_gaussians = gaussians.shape[0]
+    #     num_points = points.shape[0]
+    #     num_gaussians = gaussians.shape[0]
         
-        # Initialize the output array
-        results = torch.zeros(num_points, num_gaussians, 2)
+    #     # Initialize the output array
+    #     results = torch.zeros(num_points, num_gaussians, 2)
         
-        # Vectorized implementation
-        points = points.unsqueeze(1).repeat(1, num_gaussians, 1)
-        gaussians = gaussians.unsqueeze(0).repeat(num_points, 1, 1)
-        if use_point_radius:
-            radii = radii.unsqueeze(0).repeat(num_points, 1)
+    #     # Vectorized implementation
+    #     points = points.unsqueeze(1).repeat(1, num_gaussians, 1)
+    #     gaussians = gaussians.unsqueeze(0).repeat(num_points, 1, 1)
+    #     if use_point_radius:
+    #         radii = radii.unsqueeze(0).repeat(num_points, 1)
         
-        # Compute distances
-        dists = torch.norm(points - gaussians, dim=-1)
+    #     # Compute distances
+    #     dists = torch.norm(points - gaussians, dim=-1)
         
-        # Check if distances are smaller than radii
-        if use_point_radius:
-            within_radius = dists < (radii*3 + self.agent_radius)
-        else:
-            within_radius = dists < (self.agent_radius)
+    #     # Check if distances are smaller than radii
+    #     if use_point_radius:
+    #         within_radius = dists < (radii*3 + self.agent_radius)
+    #     else:
+    #         within_radius = dists < (self.agent_radius)
         
-        # Fill the results array
-        results[:, :, 0] = dists
-        results[:, :, 1] = within_radius.float()  # convert boolean to float for storage
+    #     # Fill the results array
+    #     results[:, :, 0] = dists
+    #     results[:, :, 1] = within_radius.float()  # convert boolean to float for storage
         
-        # print("return results shape: ", results.shape)
-        # print(results)
-        return results
+    #     # print("return results shape: ", results.shape)
+    #     # print(results)
+    #     return results
 
     def collision_testing_debug(self, points, use_point_radius=True):
         '''
@@ -180,53 +182,53 @@ class MapUtil:
         and the second column is whether the distance is smaller than the 3*radius+agent radius
         '''
         # Mask out min_height
-        # take first point height
-        # min_z = points[0, 2] + 0.5
-        # # z_mask = self.gaussians['means3D'][:, 2] > min_z
-        # z_mask = (self.gaussians['ground_labels'] == 0) # keep points that are not ground
-        # print('Num gaussians before mask: ', self.gaussians['means3D'].shape[0])
         gaussians = self.gaussians['means3D']
-        # print('Num gaussians after mask: ', gaussians.shape[0])
+        # gaussians = self.gaussians['means3D'][z_mask]
         if use_point_radius:
             radii = self.gaussians['radius']
+            # radii = self.gaussians['radius'][z_mask]
 
+            # Ensure radius is squeezed to correct shape
             radii = radii.squeeze()
-        # print("shape of points: ", points.shape)
-        # print("shape of gaussians: ", self.gaussians['means3D'].shape)
-        # print("shape of radius: ", self.gaussians['radius'].shape)
-        # if poitns not tensor, convert to tensor
+        
+        # Ensure points is a tensor and move it to the correct device
         if not torch.is_tensor(points):
             points = torch.tensor(points).to(self.gaussians['means3D'].device)
+        
+        # Handle both [M, N, 3] and [N, 3] cases
+        if points.dim() == 2:
+            points = points.unsqueeze(0)  # Convert [N, 3] to [1, N, 3]
 
-        num_points = points.shape[0]
+        M, N, _ = points.shape
         num_gaussians = gaussians.shape[0]
         
         # Initialize the output array
-        results = torch.zeros(num_points, num_gaussians, 2)
+        results = torch.zeros(M, N, num_gaussians, 2, device=points.device)
         
         # Vectorized implementation
-        points = points.unsqueeze(1).repeat(1, num_gaussians, 1)
-        gaussians = gaussians.unsqueeze(0).repeat(num_points, 1, 1)
+        points = points.unsqueeze(2).repeat(1, 1, num_gaussians, 1)  # Shape: [M, N, num_gaussians, 3]
+        gaussians = gaussians.unsqueeze(0).unsqueeze(0).repeat(M, N, 1, 1)  # Shape: [M, N, num_gaussians, 3]
         if use_point_radius:
-            radii = radii.unsqueeze(0).repeat(num_points, 1)
+            radii = radii.unsqueeze(0).unsqueeze(0).repeat(M, N, 1)  # Shape: [M, N, num_gaussians]
         
         # Compute distances
-        dists = torch.norm(points - gaussians, dim=-1)
+        dists = torch.norm(points - gaussians, dim=-1)  # Shape: [M, N, num_gaussians]
         
-        # Check if distances are smaller than radii
+        # Check if distances are smaller than radii\
         if use_point_radius:
-            within_radius = dists < (radii*3 + self.agent_radius)
+            within_radius = dists < (radii * 3 + self.agent_radius)  # Shape: [M, N, num_gaussians]
         else:
-            within_radius = dists < (self.agent_radius)
+            within_radius = dists < self.agent_radius
         
         # Fill the results array
-        results[:, :, 0] = dists
-        results[:, :, 1] = within_radius.float()  # convert boolean to float for storage
+        results[:, :, :, 0] = dists
+        results[:, :, :, 1] = within_radius.float()  # Convert boolean to float for storage
         
-        # print("return results shape: ", results.shape)
-        # print(results)
-        return results, gaussians
+        # If the input was [N, 3], return [N, num_gaussians, 2] instead of [1, N, num_gaussians, 2]
+        if M == 1:
+            results = results.squeeze(0)
 
+        return results, gaussians
 
     def new_collision_testing(self, points, use_point_radius=True):
         '''
@@ -241,14 +243,16 @@ class MapUtil:
         '''
         # Mask out min_height
         # take first point height
-        if points.dim() == 2:
-            min_z = points[0, 2] + 0.5
-        else:
-            min_z = points[0, 0, 2] + 0.5
-        z_mask = self.gaussians['means3D'][:, 2] > min_z
-        gaussians = self.gaussians['means3D'][z_mask]
+        # if points.dim() == 2:
+        #     min_z = points[0, 2] + 0.5
+        # else:
+        #     min_z = points[0, 0, 2] + 0.5
+        # z_mask = self.gaussians['means3D'][:, 2] > min_z
+        gaussians = self.gaussians['means3D']
+        # gaussians = self.gaussians['means3D'][z_mask]
         if use_point_radius:
-            radii = self.gaussians['radius'][z_mask]
+            radii = self.gaussians['radius']
+            # radii = self.gaussians['radius'][z_mask]
 
             # Ensure radius is squeezed to correct shape
             radii = radii.squeeze()
