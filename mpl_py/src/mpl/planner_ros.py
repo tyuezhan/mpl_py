@@ -50,6 +50,8 @@ class LocalPlanner:
         self.num = rospy.get_param("~num_discretization", 5)
         self.plan_max_time = rospy.get_param("~plan_t_max", 0.3)
         self.collision_tol = rospy.get_param("~collision_tol", 3)
+        self.pub_collision_map_ = rospy.get_param("~pub_collision_map", False)
+        self.along_path_ = rospy.get_param("~crop_goal_along_path", False)
         self.sim_ = rospy.get_param("~gs_sim", False)
         if self.sim_:  # for sim
             self.odom_frame_id = rospy.get_param("~odom_frame_id", "odom")
@@ -122,6 +124,8 @@ class LocalPlanner:
         rospy.loginfo(f"plan_t_max: {self.plan_max_time}")
         rospy.loginfo(f"odom_topic: {self.odom_topic}")
         rospy.loginfo(f"planning_horizon: {self.horizon}")
+        rospy.loginfo(f"pub_collision_map: {self.pub_collision_map_}")
+        rospy.loginfo(f"crop_goal_along_path: {self.along_path_}")
 
         rospy.loginfo("Local planner initialized!")
 
@@ -263,7 +267,11 @@ class LocalPlanner:
 
         t0 = rospy.Time.now()
         valid = self.planner.plan(start, goal, params, intrinsics)
-        self.publish_collision_pts(start.pos)
+        
+        # For debug collision points.
+        if self.pub_collision_map_:
+            self.publish_collision_pts(start.pos)
+
         if not valid:
             if self.planner.initialized():
                 rospy.logerr("Failed! Takes {} sec for planning, expand {} nodes".format((rospy.Time.now() - t0).to_sec(),
@@ -493,7 +501,7 @@ class LocalPlanner:
         self.start_.yaw = self.odom_yaw_
 
         # call get_local_goal function to get local goal
-        goal_pos, goal_yaw = self.get_local_goal(self.start_.pos, path_to_ftr, horizon=self.horizon)
+        goal_pos, goal_yaw = self.get_local_goal(self.start_.pos, path_to_ftr, horizon=self.horizon, along_path=self.along_path_)
         self.goal_.pos[:2] = goal_pos
         self.goal_.pos[2] = self.odom_pos_[2]
         self.goal_.yaw = goal_yaw
@@ -514,7 +522,7 @@ class LocalPlanner:
         self.goal_pub_.publish(goal_msg)
 
 
-    def get_local_goal(self, s_pos, path, horizon=3):
+    def get_local_goal(self, s_pos, path, horizon=3, along_path=False):
         # Path is a Nx2 array
         # horizon is the distance to look ahead
         # iterate through the path and find waypoints that are outside the horizon
@@ -526,20 +534,23 @@ class LocalPlanner:
         elif path.shape[0] == 1:
             return path[0], np.arctan2(path[0][1] - s_pos[1], path[0][0] - s_pos[0])
         else:
-            dist = 0
-            for i in range(path.shape[0]):
-                if i == 0:
+            if along_path:
+                dist = 0
+                for i in range(path.shape[0]):
+                    if i == 0:
+                        dist = np.linalg.norm(s_pos[:2] - path[i])
+                    else:
+                        dist += np.linalg.norm(path[i-1] - path[i])
+                    if dist > horizon:
+                        return path[i], np.arctan2(path[i][1] - s_pos[1], path[i][0] - s_pos[0])
+                return path[-1], np.arctan2(path[-1][1] - s_pos[1], path[-1][0] - s_pos[0])
+            else:
+                for i in range(path.shape[0]):
                     dist = np.linalg.norm(s_pos[:2] - path[i])
-                else:
-                    dist += np.linalg.norm(path[i-1] - path[i])
-                if dist > horizon:
-                    return path[i], np.arctan2(path[i][1] - s_pos[1], path[i][0] - s_pos[0])
-            return path[-1], np.arctan2(path[-1][1] - s_pos[1], path[-1][0] - s_pos[0])
-            # for i in range(path.shape[0]):
-            #     dist = np.linalg.norm(s_pos[:2] - path[i])
-            #     if dist > horizon:
-            #         return path[i-1], np.arctan2(path[i][1] - s_pos[1], path[i][0] - s_pos[0]) 
-            # return path[-1], np.arctan2(path[-1][1] - s_pos[1], path[-1][0] - s_pos[0])
+                    if dist > horizon:
+                        return path[i], np.arctan2(path[i][1] - s_pos[1], path[i][0] - s_pos[0])
+                return path[-1], np.arctan2(path[-1][1] - s_pos[1], path[-1][0] - s_pos[0])
+
 
     def publish_collision_pts(self, pos):
         s_time = rospy.Time.now()
