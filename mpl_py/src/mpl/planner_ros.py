@@ -224,7 +224,7 @@ class LocalPlanner:
         # self.plan_traj(self.start_, self.goal_, params, intrinsics)
 
 
-    def plan_traj(self, start, goal, params, intrinsics):
+    def plan_traj(self, start, goal, params, intrinsics, img_w, img_h):
         # Lookup transform
         try:
             # Lookup the static transform
@@ -266,7 +266,7 @@ class LocalPlanner:
         rospy.loginfo("Called plan traj!")
 
         t0 = rospy.Time.now()
-        status = self.planner.plan(start, goal, params, intrinsics)
+        status = self.planner.plan(start, goal, params, intrinsics, img_w, img_h)
         
         # For debug collision points.
         if self.pub_collision_map_:
@@ -485,7 +485,7 @@ class LocalPlanner:
         rospy.loginfo(f"[MPL planner] Published Map! Time: {(e_time-s_time).to_sec()} s")
 
 
-    def plan_to_ftr(self, params, intrinsics, path_to_ftr):
+    def plan_to_ftr(self, params, intrinsics, path_to_ftr, img_w, img_h):
         # set start pos as 1.0 second on the previous traj.
         # if self.last_plan_success_:
         #     # Take previous traj
@@ -508,7 +508,7 @@ class LocalPlanner:
         self.goal_.pos[:2] = goal_pos
         self.goal_.pos[2] = self.odom_pos_[2]
         self.goal_.yaw = goal_yaw
-        self.plan_traj(self.start_, self.goal_, params, intrinsics)
+        self.plan_traj(self.start_, self.goal_, params, intrinsics, img_w, img_h)
 
         # Compose goal msg
         goal_msg = PoseStamped()

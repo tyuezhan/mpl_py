@@ -299,7 +299,7 @@ class Planner:
         return wps_map, cost, traj
         
     
-    def plan(self, start: Waypoint, goal: Waypoint, params, intrinsics) -> bool:
+    def plan(self, start: Waypoint, goal: Waypoint, params, intrinsics, img_w, img_h) -> bool:
         if self.planner_verbose:
             start.print("Start:")
             goal.print("Goal:")
@@ -333,7 +333,7 @@ class Planner:
             if len(wps) == 0:
                 return 0
             # Call gaussian gradient cost here
-            utils = self.eval_traj_func(wps, params, intrinsics)
+            utils = self.eval_traj_func(wps, params, intrinsics, img_w, img_h)
             utils = [util.detach().cpu().numpy() for util in utils]
             best_idx = np.argmin(utils)
             best_traj = trajs[best_idx]           
