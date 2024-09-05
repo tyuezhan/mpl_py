@@ -52,8 +52,6 @@ class Trajectory:
         self.segs = primitives
         self.taus = [0]
         for pr in primitives:
-            print(type(pr))
-            print(self.taus[-1])
             self.taus.append(pr.t + self.taus[-1])
         self.Ts = self.taus
         self.total_t_ = self.taus[-1]

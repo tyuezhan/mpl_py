@@ -140,9 +140,9 @@ class LocalPlanner:
                 target_frame = 'gs_map'
                 transform = self.tf_buffer.lookup_transform(source_frame, target_frame, rospy.Time(0))
                 # Print out the transform details
-                rospy.loginfo(f"Transform from {source_frame} to {target_frame}:")
-                rospy.loginfo(f"Translation: {transform.transform.translation.x}, {transform.transform.translation.y}, {transform.transform.translation.z}")
-                rospy.loginfo(f"Rotation: {transform.transform.rotation.x}, {transform.transform.rotation.y}, {transform.transform.rotation.z}, {transform.transform.rotation.w}")
+                # rospy.loginfo(f"Transform from {source_frame} to {target_frame}:")
+                # rospy.loginfo(f"Translation: {transform.transform.translation.x}, {transform.transform.translation.y}, {transform.transform.translation.z}")
+                # rospy.loginfo(f"Rotation: {transform.transform.rotation.x}, {transform.transform.rotation.y}, {transform.transform.rotation.z}, {transform.transform.rotation.w}")
             except tf2_ros.LookupException as e:
                 rospy.logerr(f"Transform lookup failed: {e}")
                 return
@@ -156,7 +156,6 @@ class LocalPlanner:
             self.map = {}
             # Apply tf to means
             # check means device
-            print(means.device)
             # use torch to apply the transform
             # create H from the transform
             map2world = np.eye(4)
@@ -232,9 +231,9 @@ class LocalPlanner:
             target_frame = self.odom_frame_id
             transform = self.tf_buffer.lookup_transform(source_frame, target_frame, rospy.Time(0))
             # Print out the transform details
-            rospy.loginfo(f"Transform from {source_frame} to {target_frame}:")
-            rospy.loginfo(f"Translation: {transform.transform.translation.x}, {transform.transform.translation.y}, {transform.transform.translation.z}")
-            rospy.loginfo(f"Rotation: {transform.transform.rotation.x}, {transform.transform.rotation.y}, {transform.transform.rotation.z}, {transform.transform.rotation.w}")
+            # rospy.loginfo(f"Transform from {source_frame} to {target_frame}:")
+            # rospy.loginfo(f"Translation: {transform.transform.translation.x}, {transform.transform.translation.y}, {transform.transform.translation.z}")
+            # rospy.loginfo(f"Rotation: {transform.transform.rotation.x}, {transform.transform.rotation.y}, {transform.transform.rotation.z}, {transform.transform.rotation.w}")
         except tf2_ros.LookupException as e:
             rospy.logerr(f"Transform lookup failed: {e}")
             return -1
@@ -320,7 +319,6 @@ class LocalPlanner:
             header = Header()
             header.frame_id = "world"
             header.stamp = rospy.Time.now()
-            print(type(traj))
             # Publish trajectory as primitives
             prs_msg = to_primitive_array_ros_msg(traj.get_primitives())
             prs_msg.header = header
@@ -530,8 +528,6 @@ class LocalPlanner:
         # horizon is the distance to look ahead
         # iterate through the path and find waypoints that are outside the horizon
         # return the first waypoint that is outside the horizon
-        print("path:", path)
-        print("s_pos:", s_pos) 
         if path.shape[0] == 0:
             return s_pos[:2], 0
         elif path.shape[0] == 1:

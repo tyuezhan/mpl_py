@@ -191,7 +191,6 @@ class PlannerTest:
             header = Header()
             header.frame_id = "world"
             header.stamp = t0
-            print(type(traj))
             # Publish trajectory as primitives
             prs_msg = to_primitive_array_ros_msg(traj.get_primitives())
             prs_msg.header = header

@@ -116,9 +116,9 @@ class Planner:
                         if coord.vel not in vels:
                             vels.append(coord.vel)
         
-        for vel in vels:
-            print(f"vel: {vel}")
-        print("=========================")
+        # for vel in vels:
+        #     print(f"vel: {vel}")
+        # print("=========================")
         return ps
     
     def getTraj(self):
@@ -301,8 +301,8 @@ class Planner:
     
     def plan(self, start: Waypoint, goal: Waypoint, params, intrinsics, img_w, img_h) -> bool:
         if self.planner_verbose:
-            start.print("Start:")
-            goal.print("Goal:")
+            # start.print("Start:")
+            # goal.print("Goal:")
             self.ENV.info()
         
         if not self.ENV.is_free(start.pos):
