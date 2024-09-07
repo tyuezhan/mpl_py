@@ -528,6 +528,11 @@ class LocalPlanner:
         # horizon is the distance to look ahead
         # iterate through the path and find waypoints that are outside the horizon
         # return the first waypoint that is outside the horizon
+        
+        # first identify which node we are closest to
+        closest_idx = np.argmin(np.linalg.norm(path - s_pos[:2], axis=1))
+        path = path[closest_idx:]
+
         if path.shape[0] == 0:
             return s_pos[:2], 0
         elif path.shape[0] == 1:
