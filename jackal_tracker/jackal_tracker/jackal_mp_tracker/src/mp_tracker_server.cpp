@@ -21,7 +21,8 @@ MPTrackerServer::MPTrackerServer(ros::NodeHandle& nh_, ros::NodeHandle& pnh_)
   pnh_.param("use_sim", use_sim_, false);
   pnh_.param("sensor_frame", sensor_frame_, std::string("odom"));
   pnh_.param("body_frame", body_frame_, std::string("base_link"));
-
+  pnh_.param("reverse_with_cmd_queue", use_cmd_queue_, false);
+  pnh_.param("cmd_queue_size", cmd_queue_size_, 300);
   // Controller
   linear_controller_.reset(new PIDController(v_kp_, v_ki_, v_kd_, v_max_i_, v_max_));
   angular_controller_.reset(new PIDController(w_kp_, w_ki_, w_kd_, w_max_i_, w_max_));
@@ -260,6 +261,7 @@ void MPTrackerServer::toTrajectory3D(const planning_ros_msgs::Trajectory& traj_m
     } else
       traj_->total_t_ = traj_->taus.back();
   } else {
+    if (use_cmd_queue_) return;
     // If reverse:
     int seg_id = 0;
     int closest_seg_id = 0;
@@ -353,6 +355,21 @@ void MPTrackerServer::update() {
 
   geometry_msgs::Twist cmd_vel;
 
+  if (reverse_traj_ && use_cmd_queue_) {
+    if (!cmd_queue_.empty()) {
+      // reset_cmd_queue_ = true; // Set this to true, next time when new traj comes, flush the queue
+      geometry_msgs::Twist last_cmd = cmd_queue_.back();
+      cmd_queue_.pop_back();
+      cmd_vel.linear.x = -last_cmd.linear.x;
+      cmd_vel.angular.z = -last_cmd.angular.z;
+      cmd_vel_pub_.publish(cmd_vel);
+      ROS_INFO("cmd_vel.linear.x: %f, cmd_vel.angular.z: %f", cmd_vel.linear.x, cmd_vel.angular.z);
+      t_prev_ = t_now;
+      return;
+    }
+  }
+
+
   if (traj_finished_) {
     ROS_WARN("[MPTrackerServer] Trajectory finished.");
     ROS_WARN("[MPTrackerServer] Trajectory finished.");
@@ -437,7 +454,7 @@ void MPTrackerServer::update() {
     double error_pos = sqrt(dx * dx + dy * dy);
 
     // ROS_WARN("Before adding controller output: v: %f, w: %f", traj_vel, yaw_vel);
-    if (reverse_traj_) {
+    if (reverse_traj_ && !use_cmd_queue_) {
       // 1. the original traj_vel needs to be flipped (we go reverse direction)
       // 2. position error sign needs to be flipped
       cmd_vel.linear.x = -traj_vel;
@@ -447,6 +464,10 @@ void MPTrackerServer::update() {
     } else {
       cmd_vel.linear.x = traj_vel + linear_controller_->compute(error_pos, (t_now - t_prev_).toSec(), pos_error_sign);
       cmd_vel.angular.z = yaw_vel + angular_controller_->compute(error_yaw, (t_now - t_prev_).toSec(), 1);
+      cmd_queue_.push_back(cmd_vel);
+      if (cmd_queue_.size() > cmd_queue_size_) {
+        cmd_queue_.pop_front();
+      }
     }
 
     // cmd_vel.linear.x = kv_ * sqrt(dx * dx + dy * dy);

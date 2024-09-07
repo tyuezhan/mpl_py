@@ -12,6 +12,7 @@
 #include <tf2/utils.h>
 #include "tf2_ros/transform_listener.h"
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
+#include <list>
 
 
 #include <Eigen/Geometry>
@@ -144,6 +145,11 @@ class MPTrackerServer {
   std::string body_frame_;
   Eigen::Matrix4d b2s_;
   bool sensor_tf_init_;
+  bool use_cmd_queue_;
+  std::list<geometry_msgs::Twist> cmd_queue_;
+  int cmd_queue_size_;
+  bool reset_cmd_queue_;
+
 
   // double error_prev_;
   // double error_integral_;
