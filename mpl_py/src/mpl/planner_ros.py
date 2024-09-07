@@ -70,6 +70,8 @@ class LocalPlanner:
         self.last_plan_success_ = False
         self.reversing_ = False
         self.horizon = rospy.get_param("~planning_horizon", 3)
+        self.curr_path = None
+        self.cropped_path = None
 
         # Compute U
         # du = 0.8 * self.v_max / (2*self.num)
@@ -530,30 +532,48 @@ class LocalPlanner:
         # return the first waypoint that is outside the horizon
         
         # first identify which node we are closest to
-        closest_idx = np.argmin(np.linalg.norm(path - s_pos[:2], axis=1))
-        path = path[closest_idx:]
-
-        if path.shape[0] == 0:
+        if self.curr_path is not None:
+            # check if path changed
+            if np.array_equal(path, self.curr_path):
+                # path is the same, just used the cropped path
+                if self.cropped_path is not None:
+                    closest_idx = np.argmin(np.linalg.norm(self.cropped_path - s_pos[:2], axis=1))
+                    self.cropped_path = self.cropped_path[closest_idx:]
+                else:
+                    # path is not cropped yet, crop it and save as cropped path
+                    closest_idx = np.argmin(np.linalg.norm(path - s_pos[:2], axis=1))
+                    self.cropped_path = path[closest_idx:]
+            else:
+                # path changed, update the current path
+                self.curr_path = path
+                closest_idx = np.argmin(np.linalg.norm(path - s_pos[:2], axis=1))
+                self.cropped_path = path[closest_idx:]
+        else:
+            self.curr_path = path
+            closest_idx = np.argmin(np.linalg.norm(path - s_pos[:2], axis=1))
+            self.cropped_path = path[closest_idx:]
+            
+        if self.cropped_path.shape[0] == 0:
             return s_pos[:2], 0
-        elif path.shape[0] == 1:
-            return path[0], np.arctan2(path[0][1] - s_pos[1], path[0][0] - s_pos[0])
+        elif self.cropped_path.shape[0] == 1:
+            return self.cropped_path[0], np.arctan2(self.cropped_path[0][1] - s_pos[1], self.cropped_path[0][0] - s_pos[0])
         else:
             if along_path:
                 dist = 0
-                for i in range(path.shape[0]):
+                for i in range(self.cropped_path.shape[0]):
                     if i == 0:
-                        dist = np.linalg.norm(s_pos[:2] - path[i])
+                        dist = np.linalg.norm(s_pos[:2] - self.cropped_path[i])
                     else:
-                        dist += np.linalg.norm(path[i-1] - path[i])
+                        dist += np.linalg.norm(self.cropped_path[i-1] - self.cropped_path[i])
                     if dist > horizon:
-                        return path[i], np.arctan2(path[i][1] - s_pos[1], path[i][0] - s_pos[0])
-                return path[-1], np.arctan2(path[-1][1] - s_pos[1], path[-1][0] - s_pos[0])
+                        return self.cropped_path[i], np.arctan2(self.cropped_path[i][1] - s_pos[1], self.cropped_path[i][0] - s_pos[0])
+                return self.cropped_path[-1], np.arctan2(self.cropped_path[-1][1] - s_pos[1], self.cropped_path[-1][0] - s_pos[0])
             else:
-                for i in range(path.shape[0]):
-                    dist = np.linalg.norm(s_pos[:2] - path[i])
+                for i in range(self.cropped_path.shape[0]):
+                    dist = np.linalg.norm(s_pos[:2] - self.cropped_path[i])
                     if dist > horizon:
-                        return path[i], np.arctan2(path[i][1] - s_pos[1], path[i][0] - s_pos[0])
-                return path[-1], np.arctan2(path[-1][1] - s_pos[1], path[-1][0] - s_pos[0])
+                        return self.cropped_path[i], np.arctan2(self.cropped_path[i][1] - s_pos[1], self.cropped_path[i][0] - s_pos[0])
+                return self.cropped_path[-1], np.arctan2(self.cropped_path[-1][1] - s_pos[1], self.cropped_path[-1][0] - s_pos[0])
 
 
     def publish_collision_pts(self, pos):
