@@ -78,7 +78,7 @@ class LocalPlanner:
         du_yaw = self.yaw_max / self.num
         self.U = []
         for dv in np.linspace(0.2 * self.v_max, self.v_max, 3*self.num):
-            for dw in np.linspace(-self.yaw_max, self.yaw_max, 3*self.num):
+            for dw in np.linspace(-self.yaw_max, self.yaw_max, 5*self.num):
                 self.U.append((dv, dw))
         print("Control:", self.U)
 
