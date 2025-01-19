@@ -97,6 +97,7 @@ class LocalPlanner:
         self.planner.setTol(self.goal_tolerance_, -1, -1)
         self.planner.setTolYaw(self.yaw_tolerance_)
         self.planner.setPlanTmax(self.plan_max_time)
+        # self.planner.setSafeHorizon()
 
         self.odom_topic = rospy.get_param("~odom_topic", "/ground_truth/husky/odom")
         self.cloud_pub_ = rospy.Publisher("mpl/cloud", PointCloud, queue_size=1)

@@ -111,7 +111,7 @@ class GraphSearch:
         
 
 
-    def Astar_best_k(self, start_coord, ENV, ss, traj, max_expand=-1, best_k=3):
+    def Astar_best_k(self, start_coord: Waypoint, ENV, ss, traj, max_expand=-1, best_k=3, safe_horizon=np.inf):
         ENV.set_plan_start_time()
 
         if ENV.is_goal(start_coord):
@@ -169,6 +169,11 @@ class GraphSearch:
             for s, succ in enumerate(succ_coord):
                 if np.isinf(succ_cost[s]):
                     continue
+
+                # Check safe horizon to determine whether to expand the node
+                if self.safe_horizon < np.inf:
+                    if np.linalg.norm(succ.pos - start_coord.pos) > self.safe_horizon:
+                        continue
 
                 if succ not in ss.hm_:
                     succ_node = State(succ)

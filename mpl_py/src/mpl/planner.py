@@ -24,6 +24,7 @@ class Planner:
         self.eval_traj_func = eval_traj_func
         self.debug = False
         self.prs_pub = rospy.Publisher("/all_candidate_trajs", MarkerArray, queue_size=1)
+        self.safe_horizon = np.inf
 
     def setMapUtil(self, map_util, primitive_dict):
         self.ENV = EnvMap(map_util, primitive_dict)
@@ -244,6 +245,10 @@ class Planner:
         if self.planner_verbose:
             print(f"[PlannerBase] set tol_yaw: {tol_yaw}")
     
+    def setSafeHorizon(self, safe_horizon: float):
+        self.safe_horizon = safe_horizon
+        if self.planner_verbose:
+            print(f"[PlannerBase] set safe horizon: {safe_horizon}")
 
     def traj_to_wps_in_map(self, cost_lst, prs_lst):
         wps_map = []
@@ -322,7 +327,7 @@ class Planner:
         if self.ss_ptr:
             self.ss_ptr.dt_ = self.ENV.get_dt()
             # self.traj_cost, prs = planner_ptr.Astar(start, self.ENV, self.ss_ptr, self.traj, self.max_num)
-            traj_cost_lst, prs_lst = planner_ptr.Astar_best_k(start, self.ENV, self.ss_ptr, self.traj, self.max_num)
+            traj_cost_lst, prs_lst = planner_ptr.Astar_best_k(start, self.ENV, self.ss_ptr, self.traj, self.max_num, safe_horizon=self.safe_horizon)
             # First, transform all waypoints to the map frame
             s_time = rospy.Time.now()
             # print("trajectory cost list: ", traj_cost_lst)
