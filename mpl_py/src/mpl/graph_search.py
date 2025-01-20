@@ -111,7 +111,7 @@ class GraphSearch:
         
 
 
-    def Astar_best_k(self, start_coord: Waypoint, ENV, ss, traj, max_expand=-1, best_k=3, safe_horizon=np.inf):
+    def Astar_best_k(self, start_coord, ENV, ss, traj, max_expand=-1, best_k=3, safe_horizon=np.inf):
         ENV.set_plan_start_time()
 
         if ENV.is_goal(start_coord):
