@@ -182,7 +182,7 @@ class LocalPlanner:
         print('Num gaussians before mask: ', means_w.shape[0])
         means_w = means_w[z_mask]
         radius_log = radius_log[z_mask]
-        print('Num gaussians after mask: ', means_w[0])
+        # print('Num gaussians after mask: ', means_w[0])
 
         self.map["means3D"] = means_w
         self.map["radius"] = torch.exp(radius_log)

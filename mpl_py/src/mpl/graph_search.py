@@ -171,8 +171,8 @@ class GraphSearch:
                     continue
 
                 # Check safe horizon to determine whether to expand the node
-                if self.safe_horizon < np.inf:
-                    if np.linalg.norm(succ.pos - start_coord.pos) > self.safe_horizon:
+                if safe_horizon < np.inf:
+                    if np.linalg.norm(succ.pos - start_coord.pos) > safe_horizon:
                         continue
 
                 if succ not in ss.hm_:
