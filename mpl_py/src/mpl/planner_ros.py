@@ -253,7 +253,7 @@ class LocalPlanner:
             transform.transform.rotation.z,
             transform.transform.rotation.w
         ]).as_euler("xyz")[2]
-        rospy.loginfo(f"Odom pos: {self.odom_pos_}, Odom yaw: {self.odom_yaw_}")
+        # rospy.loginfo(f"Odom pos: {self.odom_pos_}, Odom yaw: {self.odom_yaw_}")
 
         # if not self.odom_init_:
         #     rospy.logwarn("No odometry!")
@@ -265,7 +265,7 @@ class LocalPlanner:
             rospy.logwarn("No world2map!")
             return -1
         
-        rospy.loginfo("Called plan traj!")
+        # rospy.loginfo("Called plan traj!")
 
         t0 = rospy.Time.now()
         status = self.planner.plan(start, goal, params, intrinsics, img_w, img_h)
@@ -338,13 +338,13 @@ class LocalPlanner:
             goal.header.frame_id = "world"
             goal.trajectory = traj_msg
             self.tracker_client.send_goal(goal)
-            rospy.loginfo("Send new goal to tracker!")
-            print(
-                "Refined traj -- J(VEL): %f, J(ACC): %f, J(JRK): %f, J(SNP): %f, "
-                "total time: %f\n" %
-                (traj.J('VEL'), traj.J('ACC'), traj.J('JRK'), traj.J('SNP'),
-                traj.get_total_time())
-            )
+            # rospy.loginfo("Send new goal to tracker!")
+            # print(
+            #     "Refined traj -- J(VEL): %f, J(ACC): %f, J(JRK): %f, J(SNP): %f, "
+            #     "total time: %f\n" %
+            #     (traj.J('VEL'), traj.J('ACC'), traj.J('JRK'), traj.J('SNP'),
+            #     traj.get_total_time())
+            # )
         else:
             rospy.logerr("[planner ros] Unknown status!")
             return -1
