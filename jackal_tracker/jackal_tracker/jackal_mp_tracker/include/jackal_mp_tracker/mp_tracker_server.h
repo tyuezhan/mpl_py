@@ -90,6 +90,7 @@ class MPTrackerServer {
   void preemptCb_();
   /* set odom, if traj is also set, call update function */
   void odomCB(const nav_msgs::Odometry::ConstPtr& msg);
+  void poseCB(const geometry_msgs::PoseStamped::ConstPtr& msg);
 
   /* compute control command (Twist) with traj and odom */
   void update();
