@@ -18,8 +18,9 @@ MPTrackerServer::MPTrackerServer(ros::NodeHandle& nh_, ros::NodeHandle& pnh_)
   pnh_.param<double>("tracker/yaw/kd", w_kd_, 1.0);
   pnh_.param<double>("tracker/yaw/max_i", w_max_i_, 1.0);
   pnh_.param<double>("tracker/yaw/max_w", w_max_, 1.0);
-  pnh_.param<bool>("use_odom_msg", use_odom_msg_);
 
+
+  pnh_.param("use_odom_msg", use_odom_msg_, false);
   pnh_.param("use_sim", use_sim_, false);
   pnh_.param("sensor_frame", sensor_frame_, std::string("odom"));
   pnh_.param("body_frame", body_frame_, std::string("base_link"));
