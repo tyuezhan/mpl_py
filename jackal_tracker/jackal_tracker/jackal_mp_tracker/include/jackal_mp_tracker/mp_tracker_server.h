@@ -5,7 +5,7 @@
 #include <geometry_msgs/Twist.h>
 #include <jackal_tracker_msgs/JackalMPTrackerAction.h>
 #include <nav_msgs/Odometry.h>
-#include <geometry_msgs/PostStamped.h>
+#include <geometry_msgs/PoseStamped.h>
 #include <planning_ros_msgs/Trajectory.h>
 #include <planning_ros_utils/primitive_ros_utils.h>
 #include <ros/ros.h>
