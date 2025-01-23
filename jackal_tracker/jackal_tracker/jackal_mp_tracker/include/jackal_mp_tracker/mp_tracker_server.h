@@ -5,6 +5,7 @@
 #include <geometry_msgs/Twist.h>
 #include <jackal_tracker_msgs/JackalMPTrackerAction.h>
 #include <nav_msgs/Odometry.h>
+#include <geometry_msgs/PostStamped.h>
 #include <planning_ros_msgs/Trajectory.h>
 #include <planning_ros_utils/primitive_ros_utils.h>
 #include <ros/ros.h>
@@ -128,6 +129,7 @@ class MPTrackerServer {
   bool traj_set_;
   bool traj_finished_;
   bool active_;
+  bool use_odom_msg_;
   ros::Time traj_start_, t_prev_;
   Eigen::Vector3d current_pos_;
   Eigen::Quaterniond current_orient_;

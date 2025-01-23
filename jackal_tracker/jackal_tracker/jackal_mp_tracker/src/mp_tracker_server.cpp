@@ -18,6 +18,8 @@ MPTrackerServer::MPTrackerServer(ros::NodeHandle& nh_, ros::NodeHandle& pnh_)
   pnh_.param<double>("tracker/yaw/kd", w_kd_, 1.0);
   pnh_.param<double>("tracker/yaw/max_i", w_max_i_, 1.0);
   pnh_.param<double>("tracker/yaw/max_w", w_max_, 1.0);
+  pnh_.param<bool>("use_odom_msg", use_odom_msg_);
+
   pnh_.param("use_sim", use_sim_, false);
   pnh_.param("sensor_frame", sensor_frame_, std::string("odom"));
   pnh_.param("body_frame", body_frame_, std::string("base_link"));
@@ -36,7 +38,9 @@ MPTrackerServer::MPTrackerServer(ros::NodeHandle& nh_, ros::NodeHandle& pnh_)
   mp_tracker_server_ptr_->start();
 
   // Subscriber
-  odom_sub_ = nh.subscribe("/odometry/filtered", 1, &MPTrackerServer::odomCB, this);
+  if (use_odom_msg_) odom_sub_ = nh.subscribe("/odometry/filtered", 1, &MPTrackerServer::odomCB, this);
+  else odom_sub_ = nh.subscribe("/odometry/filtered", 1, &MPTrackerServer::poseCB, this);
+
 
   // Publisher
   cmd_vel_pub_ = nh.advertise<geometry_msgs::Twist>("/tracker/cmd_vel", 1);
@@ -150,6 +154,74 @@ void MPTrackerServer::odomCB(const nav_msgs::Odometry::ConstPtr& msg) {
   // control (Twist)
   update();
 }
+
+
+void MPTrackerServer::poseCB(const geometry_msgs::PoseStamped::ConstPtr& msg) {
+  if (!sensor_tf_init_) {
+    if (use_sim_) {
+      b2s_ = Eigen::Matrix4d::Identity();
+      sensor_tf_init_ = true;
+    } else {
+      if (!lookupOdomTransform()) return;
+    }
+  }
+  if (use_sim_) {
+    odom_time_ = msg->header.stamp;
+    odom_pos_(0) = msg->pose.position.x;
+    odom_pos_(1) = msg->pose.position.y;
+    odom_pos_(2) = msg-> pose.position.z;
+
+    // odom_vel_(0) = msg->twist.twist.linear.x;
+    // odom_vel_(1) = msg->twist.twist.linear.y;
+    // odom_vel_(2) = msg->twist.twist.linear.z;
+
+    odom_orient_.w() = msg->pose.orientation.w;
+    odom_orient_.x() = msg->pose.orientation.x;
+    odom_orient_.y() = msg->pose.orientation.y;
+    odom_orient_.z() = msg->pose.orientation.z;
+    double yaw, _pitch, _roll;
+    tf2::Matrix3x3(tf2::Quaternion(msg->pose.orientation.x, msg->pose.orientation.y,
+                                  msg->pose.orientation.z, msg->pose.orientation.w)).getEulerYPR(yaw, _pitch, _roll);
+    odom_yaw_ = yaw;
+    odom_set_ = true;
+  } else {
+    odom_time_ = msg->header.stamp;
+    Eigen::Quaterniond sensor_q = Eigen::Quaterniond(msg->pose.orientation.w,
+                                                 msg->pose.orientation.x,
+                                                 msg->pose.orientation.y,
+                                                 msg->pose.orientation.z);
+    Eigen::Matrix3d sensor_r_m = sensor_q.toRotationMatrix();
+    Eigen::Matrix4d s2w = Eigen::Matrix4d::Identity();
+    s2w.block<3, 3>(0, 0) = sensor_r_m;
+    s2w(0, 3) = msg->pose.position.x;
+    s2w(1, 3) = msg->pose.position.y;
+    s2w(2, 3) = msg->pose.position.z;
+    s2w(3, 3) = 1.0;
+    // std::cout<< "Before transform, s2w:\n " << s2w << std::endl;
+    Eigen::Matrix4d body_pose = s2w * b2s_;
+    odom_pos_ = body_pose.block<3, 1>(0, 3);
+    odom_orient_ = Eigen::Quaterniond(body_pose.block<3, 3>(0, 0));
+    double yaw, _pitch, _roll;
+    tf2::Matrix3x3(tf2::Quaternion(odom_orient_.x(), odom_orient_.y(), odom_orient_.z(), odom_orient_.w())).getEulerYPR(yaw, _pitch, _roll);
+    odom_yaw_ = yaw;
+    // std::cout<< "After transform, body_pose:\n " << body_pose << std::endl;
+    // Apply to linear velocity
+    // std::cout<< "Before transform, sensor_vel:\n " << msg->twist.twist.linear << std::endl;
+    // Eigen::Vector3d sensor_vel(msg->twist.twist.linear.x,
+    //                            msg->twist.twist.linear.y,
+    //                            msg->twist.twist.linear.z);
+    // Eigen::Vector3d body_vel = sensor_r_m * sensor_vel;
+    // odom_vel_ = body_vel;
+    // std::cout<< "After transform, body_vel:\n " << body_vel << std::endl;
+    odom_set_ = true;
+  }
+
+  // When there is odom, and there is a traj, we call update function to compute new
+  // control (Twist)
+  update();
+}
+
+
 
 void MPTrackerServer::resetParam() {
   traj_set_ = false;
