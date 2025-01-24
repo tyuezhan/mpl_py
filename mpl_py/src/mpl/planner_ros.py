@@ -532,28 +532,29 @@ class LocalPlanner:
         # iterate through the path and find waypoints that are outside the horizon
         # return the first waypoint that is outside the horizon
         
-        # first identify which node we are closest to
+        # first identify which node we are closest to, and we start from there
         if self.curr_path is not None:
             # check if path changed
             if np.array_equal(path, self.curr_path):
                 # path is the same, just used the cropped path
                 if self.cropped_path is not None:
                     closest_idx = np.argmin(np.linalg.norm(self.cropped_path - s_pos[:2], axis=1))
-                    self.cropped_path = self.cropped_path[closest_idx:]
+                    # self.cropped_path = self.cropped_path[closest_idx:]
                 else:
                     # path is not cropped yet, crop it and save as cropped path
                     closest_idx = np.argmin(np.linalg.norm(path - s_pos[:2], axis=1))
-                    self.cropped_path = path[closest_idx:]
+                    # self.cropped_path = path[closest_idx:]
             else:
                 # path changed, update the current path
                 self.curr_path = path
                 closest_idx = np.argmin(np.linalg.norm(path - s_pos[:2], axis=1))
-                self.cropped_path = path[closest_idx:]
+                # self.cropped_path = path[closest_idx:]
         else:
             self.curr_path = path
             closest_idx = np.argmin(np.linalg.norm(path - s_pos[:2], axis=1))
-            self.cropped_path = path[closest_idx:]
-            
+            # self.cropped_path = path[closest_idx:]
+        dist_to_path_node = np.linalg.norm(s_pos[:2] - path[closest_idx])
+        
         if self.cropped_path.shape[0] == 0:
             return s_pos[:2], 0
         elif self.cropped_path.shape[0] == 1:
@@ -561,9 +562,9 @@ class LocalPlanner:
         else:
             if along_path:
                 dist = 0
-                for i in range(self.cropped_path.shape[0]):
-                    if i == 0:
-                        dist = np.linalg.norm(s_pos[:2] - self.cropped_path[i])
+                for i in range(closest_idx, self.cropped_path.shape[0]):
+                    if i == closest_idx:
+                        dist = dist_to_path_node
                     else:
                         dist += np.linalg.norm(self.cropped_path[i-1] - self.cropped_path[i])
                     if dist > horizon:
@@ -575,8 +576,11 @@ class LocalPlanner:
                         return wp, yaw
                 return self.cropped_path[-1], np.arctan2(self.cropped_path[-1][1] - s_pos[1], self.cropped_path[-1][0] - s_pos[0])
             else:
-                for i in range(self.cropped_path.shape[0]):
-                    dist = np.linalg.norm(s_pos[:2] - self.cropped_path[i])
+                for i in range(closest_idx, self.cropped_path.shape[0]):
+                    if i == closest_idx:
+                        dist = dist_to_path_node
+                    else:
+                        dist = np.linalg.norm(s_pos[:2] - self.cropped_path[i])
                     if dist > horizon:
                         # set waypoint, and yaw
                         wp = self.cropped_path[i]
