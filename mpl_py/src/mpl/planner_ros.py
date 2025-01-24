@@ -583,6 +583,7 @@ class LocalPlanner:
                         yaw = np.arctan2(self.cropped_path[i][1] - s_pos[1], self.cropped_path[i][0] - s_pos[0])
                         # return self.cropped_path[i], np.arctan2(self.cropped_path[i][1] - s_pos[1], self.cropped_path[i][0] - s_pos[0])
                         self.cropped_path = self.cropped_path[i:]
+                        return wp, yaw
                 return self.cropped_path[-1], np.arctan2(self.cropped_path[-1][1] - s_pos[1], self.cropped_path[-1][0] - s_pos[0])
 
 
