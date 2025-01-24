@@ -304,7 +304,7 @@ class Planner:
         return wps_map, cost, traj
         
     
-    def plan(self, start: Waypoint, goal: Waypoint, params, intrinsics, img_w, img_h) -> bool:
+    def plan(self, start: Waypoint, goal: Waypoint, intrinsics, img_w, img_h) -> bool:
         if self.planner_verbose:
             # start.print("Start:")
             # goal.print("Goal:")
@@ -326,25 +326,26 @@ class Planner:
         
         if self.ss_ptr:
             self.ss_ptr.dt_ = self.ENV.get_dt()
-            # self.traj_cost, prs = planner_ptr.Astar(start, self.ENV, self.ss_ptr, self.traj, self.max_num)
-            traj_cost_lst, prs_lst = planner_ptr.Astar_best_k(start, self.ENV, self.ss_ptr, self.traj, self.max_num, safe_horizon=self.safe_horizon)
+            self.traj_cost, prs = planner_ptr.Astar(start, self.ENV, self.ss_ptr, self.traj, self.max_num)
+            # traj_cost_lst, prs_lst = planner_ptr.Astar_best_k(start, self.ENV, self.ss_ptr, self.traj, self.max_num, safe_horizon=self.safe_horizon)
             # First, transform all waypoints to the map frame
             s_time = rospy.Time.now()
             # print("trajectory cost list: ", traj_cost_lst)
-            if len(traj_cost_lst) == 1 and traj_cost_lst[0] == 0:
+            # if len(traj_cost_lst) == 1 and traj_cost_lst[0] == 0:
+            if self.traj_cost == 0:
                 rospy.loginfo("Reach goal!")
                 return 1
-            wps, costs, trajs = self.traj_to_wps_in_map(traj_cost_lst, prs_lst)
-            if len(wps) == 0:
-                return 0
+            # wps, costs, trajs = self.traj_to_wps_in_map([traj_cost], [prs])
+            # if len(wps) == 0:
+            #     return 0
             # Call gaussian gradient cost here
-            utils = self.eval_traj_func(wps, params, intrinsics, img_w, img_h)
-            utils = [util.detach().cpu().numpy() for util in utils]
-            best_idx = np.argmin(utils)
-            best_traj = trajs[best_idx]           
-            rospy.loginfo("Eval traj util time: {}".format((rospy.Time.now() - s_time).to_sec()))
-            self.traj.init_trajectory(best_traj)
-            self.traj_cost = costs[best_idx]
+            # utils = self.eval_traj_func(wps, params, intrinsics, img_w, img_h)
+            # utils = [util.detach().cpu().numpy() for util in utils]
+            # best_idx = np.argmin(utils)
+            # best_traj = trajs[best_idx]           
+            # rospy.loginfo("Eval traj util time: {}".format((rospy.Time.now() - s_time).to_sec()))
+            self.traj.init_trajectory(prs)
+            # self.traj_cost = costs[best_idx]
         if np.isinf(self.traj_cost):
             if self.planner_verbose:
                 rospy.loginfo("[PlannerBase] Cannot find a trajectory!")
