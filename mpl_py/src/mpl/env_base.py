@@ -172,7 +172,7 @@ class EnvBase:
     def get_succ(self, curr, succ, succ_cost, action_idx):
         print("Used Null get_succ()")
         
-    def vec_get_succ(self, curr, succ, succ_cost, action_idx):
+    def vec_get_succ(self, curr, succ, succ_cost, action_idx, use_cpu=False):
         print("Used Null vec_get_succ()")
 
     def get_succ_with_yaw(self, curr, succ, succ_cost, action_idx, yaw_idx):

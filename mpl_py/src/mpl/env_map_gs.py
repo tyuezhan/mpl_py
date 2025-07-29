@@ -69,7 +69,7 @@ class EnvMap(EnvBase):
         #     c += self.w_view * self.get_view_correlation(pos1, p0.yaw, pos2, pt.yaw)
         return c
 
-    def vec_traverse_primitive(self, primitives):
+    def vec_traverse_primitive(self, primitives, use_cpu=False):
         n = 3
         c = np.zeros(len(primitives))
         pts_pos = np.zeros((len(primitives), n, 3))
@@ -85,7 +85,7 @@ class EnvMap(EnvBase):
         # For experiments, can add it back if needed. 
         # if self.map_util.is_outside(pts_pos):
             # return float('inf')
-        collision_costs, all_collisions = self.map_util.new_is_occupied(pts_pos)
+        collision_costs, all_collisions = self.map_util.new_is_occupied(pts_pos, use_cpu=use_cpu)
         all_collisions = all_collisions.detach().cpu().numpy()
         #c = collision_costs.detach().cpu().numpy()
         c[all_collisions] = float('inf')
@@ -118,7 +118,7 @@ class EnvMap(EnvBase):
             succ_cost.append(cost)
             action_idx.append(i)
 
-    def vec_get_succ(self, curr, succ, succ_cost, action_idx):
+    def vec_get_succ(self, curr, succ, succ_cost, action_idx, use_cpu=False):
         succ.clear()
         succ_cost.clear()
         action_idx.clear()
@@ -138,7 +138,7 @@ class EnvMap(EnvBase):
             succ.append(tn)
             primitives.append(primitive)
 
-        costs = self.vec_traverse_primitive(primitives)
+        costs = self.vec_traverse_primitive(primitives, use_cpu=use_cpu)
         for i, cost in enumerate(costs):
             if not np.isinf(cost):
                 cost += self.calculate_intrinsic_cost(primitives[i])

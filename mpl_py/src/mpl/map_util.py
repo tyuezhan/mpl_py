@@ -69,7 +69,7 @@ class MapUtil:
         # Return a boolean tensor indicating which points are outside
         return is_outside.any()
 
-    def new_is_occupied(self, pts):
+    def new_is_occupied(self, pts, use_cpu=False):
         '''
         Return 2D array of shape (M, 2)
         First row is whether the traj has collision
@@ -77,7 +77,10 @@ class MapUtil:
         '''
         # pts is Nx3 or MxNx3
         if not torch.is_tensor(pts):
-            pts = torch.tensor(pts).to(self.gaussians['means3D'].device)
+            if use_cpu:
+                pts = torch.tensor(pts).cpu()
+            else:
+                pts = torch.tensor(pts).to(self.gaussians['means3D'].device)
         
         # Handle single point case (1x3)
         if pts.shape[-1] == 3 and pts.dim() == 1:
@@ -85,7 +88,7 @@ class MapUtil:
         
         # Apply collision testing
         # ret = [M, N, num_gaussians, 2] or [N, num_gaussians, 2] if input is [N, 3]
-        ret = self.new_collision_testing(pts)
+        ret = self.new_collision_testing(pts, use_cpu=use_cpu)
         
         # If the input is MxNx3, return a tensor of shape (M,)
         if pts.dim() == 3:
@@ -230,7 +233,7 @@ class MapUtil:
 
         return results, gaussians
 
-    def new_collision_testing(self, points, use_point_radius=True):
+    def new_collision_testing(self, points, use_point_radius=True, use_cpu=False):
         '''
         This function computes each point's distance to all the gaussians in gaussians['means3D']
         and checks whether the distance is smaller than the radius.
@@ -248,10 +251,16 @@ class MapUtil:
         # else:
         #     min_z = points[0, 0, 2] + 0.5
         # z_mask = self.gaussians['means3D'][:, 2] > min_z
-        gaussians = self.gaussians['means3D']
+        if use_cpu:
+            gaussians = self.gaussians['means3D'].cpu()
+        else:
+            gaussians = self.gaussians['means3D']
         # gaussians = self.gaussians['means3D'][z_mask]
         if use_point_radius:
-            radii = self.gaussians['radius']
+            if use_cpu:
+                radii = self.gaussians['radius'].cpu()
+            else:
+                radii = self.gaussians['radius']
             # radii = self.gaussians['radius'][z_mask]
 
             # Ensure radius is squeezed to correct shape
@@ -259,7 +268,10 @@ class MapUtil:
         
         # Ensure points is a tensor and move it to the correct device
         if not torch.is_tensor(points):
-            points = torch.tensor(points).to(self.gaussians['means3D'].device)
+            if use_cpu:
+                points = torch.tensor(points).cpu()
+            else:
+                points = torch.tensor(points).to(self.gaussians['means3D'].device)
         
         # Handle both [M, N, 3] and [N, 3] cases
         if points.dim() == 2:
